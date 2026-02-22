@@ -41,178 +41,213 @@ st.markdown("""
 @st.cache_data(ttl=300)
 def load_data():
     """
-    Load data from Excel file
-    In production, this connects to your Google Drive Excel file
+    Load data from Excel file structure
+    Based on Product_Master_List.xlsx with 50 products, 5 locations, 10 suppliers
     """
-    # For Streamlit Cloud, we'll use the data structure from your Excel
-    # In production, replace with: pd.read_excel('your_google_drive_link')
     
-    # Product Master List (50 products)
-    products = pd.DataFrame({
-        'Product_ID': [f'PRD{i:05d}' for i in range(1, 51)],
-        'SKU': ['ELE9513', 'ELE6539', 'ELE5637', 'ELE4243', 'ELE6781'] + [f'SKU{i}' for i in range(6, 51)],
-        'Barcode': [8882629770, 8885034668, 8881920026, 8887653820, 8881862054] + [8882000000 + i for i in range(6, 51)],
-        'Product_Name': [
-            'LED TV', 'Smartphone', 'Laptop', 'Tablet', 'Bluetooth Speaker',
-            'Basmati Rice 5kg', 'Cooking Oil 2L', 'Sugar 1kg', 'Flour 1kg', 'Instant Noodles',
-            'Paint 5L', 'Cement 40kg', 'PVC Pipe', 'Electrical Wire', 'Light Bulb',
-            'Paracetamol', 'Cough Syrup', 'Vitamin C', 'First Aid Kit', 'Bandages',
-            'Engine Oil', 'Car Battery', 'Air Filter', 'Brake Pad', 'Spark Plug',
-            'School Uniform', 'Baju Kurung', 'Baju Melayu', 'Songkok', 'Tudung',
-            'Office Desk', 'Ergonomic Chair', 'Filing Cabinet', 'Bookshelf', 'Meeting Table',
-            'A4 Paper', 'Printer Ink', 'Ballpoint Pen', 'Notebook', 'Folder',
-            'Mineral Water', 'Soft Drinks', 'Orange Juice', 'Energy Drink', 'Milk',
-            'Facial Cleanser', 'Moisturizer', 'Lipstick', 'Foundation', 'Shampoo'
-        ],
-        'Category': [
-            'Electronics', 'Electronics', 'Electronics', 'Electronics', 'Electronics',
-            'Groceries', 'Groceries', 'Groceries', 'Groceries', 'Groceries',
-            'Hardware', 'Hardware', 'Hardware', 'Hardware', 'Hardware',
-            'Pharmaceuticals', 'Pharmaceuticals', 'Pharmaceuticals', 'Pharmaceuticals', 'Pharmaceuticals',
-            'Automotive', 'Automotive', 'Automotive', 'Automotive', 'Automotive',
-            'Textiles', 'Textiles', 'Textiles', 'Textiles', 'Textiles',
-            'Furniture', 'Furniture', 'Furniture', 'Furniture', 'Furniture',
-            'Stationery', 'Stationery', 'Stationery', 'Stationery', 'Stationery',
-            'Beverages', 'Beverages', 'Beverages', 'Beverages', 'Beverages',
-            'Cosmetics', 'Cosmetics', 'Cosmetics', 'Cosmetics', 'Cosmetics'
-        ],
-        'Unit_Cost_BND': [
-            785.00, 916.00, 618.00, 1960.00, 754.00,
-            8.00, 11.00, 47.00, 42.00, 3.00,
-            97.00, 56.00, 49.00, 37.00, 8.00,
-            141.00, 6.00, 99.00, 47.00, 76.00,
-            185.00, 119.00, 160.00, 71.00, 119.00,
-            43.00, 111.00, 111.00, 21.00, 119.00,
-            91.00, 60.00, 128.00, 46.00, 130.00,
-            136.00, 129.00, 131.00, 101.00, 56.00,
-            32.00, 10.00, 22.00, 7.00, 29.00,
-            23.00, 94.00, 141.00, 80.00, 88.00
-        ],
-        'Selling_Price_BND': [
-            1135.09, 1351.05, 872.40, 2653.80, 907.19,
-            9.81, 14.28, 62.97, 58.50, 4.34,
-            116.66, 78.46, 71.86, 44.82, 9.95,
-            189.88, 8.25, 121.28, 56.69, 110.20,
-            269.02, 167.34, 209.16, 100.99, 168.95,
-            54.40, 150.36, 152.78, 26.51, 173.22,
-            129.73, 88.18, 164.85, 58.12, 188.59,
-            190.82, 168.32, 193.55, 139.82, 73.26,
-            41.07, 12.46, 26.73, 10.05, 42.27,
-            32.48, 138.40, 179.42, 101.94, 125.16
-        ],
-        'Reorder_Level': [7, 35, 25, 6, 6, 18, 11, 46, 14, 50, 44, 34, 25, 5, 36, 13, 14, 24, 5, 5, 12, 17, 49, 14, 37, 46, 43, 21, 28, 17, 26, 8, 40, 31, 33, 27, 14, 36, 48, 27, 47, 11, 42, 37, 33, 49, 29, 24, 20, 16],
-        'Preferred_Supplier': [
-            'Supasave', 'Pohan Motors', 'Al-Falah Corporation', 'Hua Ho Trading', 'Soon Lee MegaMart',
-            'Seng Huat', 'Al-Falah Corporation', 'Hua Ho Trading', 'Hua Ho Trading', 'Supasave',
-            'SKH Group', 'Wee Hua Enterprise', 'D\'Sunlit Supermarket', 'SKH Group', 'SKH Group',
-            'Al-Falah Corporation', 'Wee Hua Enterprise', 'Al-Falah Corporation', 'SKH Group', 'Supasave',
-            'D\'Sunlit Supermarket', 'Joyful Mart', 'Seng Huat', 'Al-Falah Corporation', 'D\'Sunlit Supermarket',
-            'Pohan Motors', 'SKH Group', 'Wee Hua Enterprise', 'Wee Hua Enterprise', 'D\'Sunlit Supermarket',
-            'D\'Sunlit Supermarket', 'Supasave', 'Joyful Mart', 'Seng Huat', 'Al-Falah Corporation',
-            'SKH Group', 'Hua Ho Trading', 'Supasave', 'Joyful Mart', 'Supasave',
-            'Supasave', 'Pohan Motors', 'Supasave', 'D\'Sunlit Supermarket', 'SKH Group',
-            'Joyful Mart', 'Hua Ho Trading', 'D\'Sunlit Supermarket', 'Soon Lee MegaMart', 'SKH Group'
-        ],
-        'Status': ['Active'] * 48 + ['Discontinued', 'Discontinued']
-    })
+    # Product Master List (50 products) - Based on your actual Excel data
+    products_data = [
+        ['PRD00001', 'ELE9513', 8882629770, 'LED TV', 'Electronics', 785.00, 1135.09, 7, 'Supasave', 'Active'],
+        ['PRD00002', 'ELE6539', 8885034668, 'Smartphone', 'Electronics', 916.00, 1351.05, 35, 'Pohan Motors', 'Active'],
+        ['PRD00003', 'ELE5637', 8881920026, 'Laptop', 'Electronics', 618.00, 872.40, 25, 'Al-Falah Corporation', 'Active'],
+        ['PRD00004', 'ELE4243', 8887653820, 'Tablet', 'Electronics', 1960.00, 2653.80, 6, 'Hua Ho Trading', 'Active'],
+        ['PRD00005', 'ELE6781', 8881862054, 'Bluetooth Speaker', 'Electronics', 754.00, 907.19, 6, 'Soon Lee MegaMart', 'Active'],
+        ['PRD00006', 'GRO1086', 8888322742, 'Basmati Rice 5kg', 'Groceries', 8.00, 9.81, 18, 'Seng Huat', 'Active'],
+        ['PRD00007', 'GRO8871', 8889550421, 'Cooking Oil 2L', 'Groceries', 11.00, 14.28, 11, 'Al-Falah Corporation', 'Active'],
+        ['PRD00008', 'GRO5143', 8886941375, 'Sugar 1kg', 'Groceries', 47.00, 62.97, 46, 'Hua Ho Trading', 'Active'],
+        ['PRD00009', 'GRO6328', 8882079673, 'Flour 1kg', 'Groceries', 42.00, 58.50, 14, 'Hua Ho Trading', 'Active'],
+        ['PRD00010', 'GRO4921', 8882391650, 'Instant Noodles', 'Groceries', 3.00, 4.34, 50, 'Supasave', 'Active'],
+        ['PRD00011', 'HAR7985', 8884408841, 'Paint 5L', 'Hardware', 97.00, 116.66, 44, 'SKH Group', 'Active'],
+        ['PRD00012', 'HAR7642', 8882206083, 'Cement 40kg', 'Hardware', 56.00, 78.46, 34, 'Wee Hua Enterprise', 'Active'],
+        ['PRD00013', 'HAR3920', 8885403285, 'PVC Pipe', 'Hardware', 49.00, 71.86, 25, 'D\'Sunlit Supermarket', 'Active'],
+        ['PRD00014', 'HAR3822', 8881779092, 'Electrical Wire', 'Hardware', 37.00, 44.82, 5, 'SKH Group', 'Active'],
+        ['PRD00015', 'HAR5003', 8882343059, 'Light Bulb', 'Hardware', 8.00, 9.95, 36, 'SKH Group', 'Active'],
+        ['PRD00016', 'PHA7337', 8887613548, 'Paracetamol', 'Pharmaceuticals', 141.00, 189.88, 13, 'Al-Falah Corporation', 'Active'],
+        ['PRD00017', 'PHA2752', 8884040859, 'Cough Syrup', 'Pharmaceuticals', 6.00, 8.25, 14, 'Wee Hua Enterprise', 'Active'],
+        ['PRD00018', 'PHA3733', 8887351786, 'Vitamin C', 'Pharmaceuticals', 99.00, 121.28, 24, 'Al-Falah Corporation', 'Active'],
+        ['PRD00019', 'PHA3787', 8884640696, 'First Aid Kit', 'Pharmaceuticals', 47.00, 56.69, 5, 'SKH Group', 'Active'],
+        ['PRD00020', 'PHA4363', 8882862764, 'Bandages', 'Pharmaceuticals', 76.00, 110.20, 5, 'Supasave', 'Active'],
+        ['PRD00021', 'AUT3704', 8886967946, 'Engine Oil', 'Automotive', 185.00, 269.02, 12, 'D\'Sunlit Supermarket', 'Active'],
+        ['PRD00022', 'AUT9292', 8881721650, 'Car Battery', 'Automotive', 119.00, 167.34, 17, 'Joyful Mart', 'Active'],
+        ['PRD00023', 'AUT9310', 8885977758, 'Air Filter', 'Automotive', 160.00, 209.16, 49, 'Seng Huat', 'Active'],
+        ['PRD00024', 'AUT7977', 8884903306, 'Brake Pad', 'Automotive', 71.00, 100.99, 14, 'Al-Falah Corporation', 'Discontinued'],
+        ['PRD00025', 'AUT6650', 8881362520, 'Spark Plug', 'Automotive', 119.00, 168.95, 37, 'D\'Sunlit Supermarket', 'Active'],
+        ['PRD00026', 'TEX9302', 8882287897, 'School Uniform', 'Textiles', 43.00, 54.40, 46, 'Pohan Motors', 'Discontinued'],
+        ['PRD00027', 'TEX1181', 8883333480, 'Baju Kurung', 'Textiles', 111.00, 150.36, 43, 'SKH Group', 'Active'],
+        ['PRD00028', 'TEX8677', 8887970607, 'Baju Melayu', 'Textiles', 111.00, 152.78, 21, 'Wee Hua Enterprise', 'Active'],
+        ['PRD00029', 'TEX8913', 8883535721, 'Songkok', 'Textiles', 21.00, 26.51, 28, 'Wee Hua Enterprise', 'Active'],
+        ['PRD00030', 'TEX1792', 8882337786, 'Tudung', 'Textiles', 119.00, 173.22, 17, 'D\'Sunlit Supermarket', 'Active'],
+        ['PRD00031', 'FUR1215', 8886673723, 'Office Desk', 'Furniture', 91.00, 129.73, 26, 'D\'Sunlit Supermarket', 'Active'],
+        ['PRD00032', 'FUR6787', 8882195570, 'Ergonomic Chair', 'Furniture', 60.00, 88.18, 8, 'Supasave', 'Active'],
+        ['PRD00033', 'FUR5417', 8888670445, 'Filing Cabinet', 'Furniture', 128.00, 164.85, 40, 'Joyful Mart', 'Active'],
+        ['PRD00034', 'FUR3970', 8881510403, 'Bookshelf', 'Furniture', 46.00, 58.12, 31, 'Seng Huat', 'Active'],
+        ['PRD00035', 'FUR6963', 8883713384, 'Meeting Table', 'Furniture', 130.00, 188.59, 33, 'Al-Falah Corporation', 'Active'],
+        ['PRD00036', 'STA3134', 8883269795, 'A4 Paper', 'Stationery', 136.00, 190.82, 27, 'SKH Group', 'Active'],
+        ['PRD00037', 'STA1487', 8887250125, 'Printer Ink', 'Stationery', 129.00, 168.32, 14, 'Hua Ho Trading', 'Active'],
+        ['PRD00038', 'STA4935', 8882810353, 'Ballpoint Pen', 'Stationery', 131.00, 193.55, 36, 'Supasave', 'Active'],
+        ['PRD00039', 'STA6275', 8882205355, 'Notebook', 'Stationery', 101.00, 139.82, 48, 'Joyful Mart', 'Active'],
+        ['PRD00040', 'STA4686', 8884757367, 'Folder', 'Stationery', 56.00, 73.26, 27, 'Supasave', 'Active'],
+        ['PRD00041', 'BEV9661', 8882964355, 'Mineral Water', 'Beverages', 32.00, 41.07, 47, 'Supasave', 'Active'],
+        ['PRD00042', 'BEV4750', 8883937121, 'Soft Drinks', 'Beverages', 10.00, 12.46, 11, 'Pohan Motors', 'Active'],
+        ['PRD00043', 'BEV2188', 8882771996, 'Orange Juice', 'Beverages', 22.00, 26.73, 42, 'Supasave', 'Active'],
+        ['PRD00044', 'BEV2566', 8885056530, 'Energy Drink', 'Beverages', 7.00, 10.05, 37, 'D\'Sunlit Supermarket', 'Active'],
+        ['PRD00045', 'BEV2659', 8885907179, 'Milk', 'Beverages', 29.00, 42.27, 33, 'SKH Group', 'Active'],
+        ['PRD00046', 'COS4275', 8882812675, 'Facial Cleanser', 'Cosmetics', 23.00, 32.48, 49, 'Joyful Mart', 'Active'],
+        ['PRD00047', 'COS6234', 8881405934, 'Moisturizer', 'Cosmetics', 94.00, 138.40, 29, 'Hua Ho Trading', 'Active'],
+        ['PRD00048', 'COS4817', 8886216590, 'Lipstick', 'Cosmetics', 141.00, 179.42, 24, 'D\'Sunlit Supermarket', 'Active'],
+        ['PRD00049', 'COS9429', 8882217059, 'Foundation', 'Cosmetics', 80.00, 101.94, 20, 'Soon Lee MegaMart', 'Active'],
+        ['PRD00050', 'COS3684', 8888986667, 'Shampoo', 'Cosmetics', 88.00, 125.16, 16, 'SKH Group', 'Active'],
+    ]
     
-    # Inventory by Location (250 records)
+    products = pd.DataFrame(products_data, columns=[
+        'Product_ID', 'SKU', 'Barcode', 'Product_Name', 'Category', 
+        'Unit_Cost_BND', 'Selling_Price_BND', 'Reorder_Level', 
+        'Preferred_Supplier', 'Status'
+    ])
+    
+    # Inventory by Location (250 records - 50 products × 5 locations)
     locations = ['Warehouse A - Beribi', 'Store 1 - Gadong', 'Store 2 - Kiulap', 'Store 3 - Kuala Belait', 'Store 4 - Tutong']
+    
+    # Sample quantities based on your Excel data patterns
     inventory_data = []
+    base_quantities = {
+        'PRD00001': [163, 132, 171, 179, 172],
+        'PRD00002': [19, 163, 42, 165, 76],
+        'PRD00003': [64, 159, 175, 40, 136],
+        'PRD00004': [143, 159, 102, 78, 132],
+        'PRD00005': [104, 2, 115, 169, 183],
+        'PRD00006': [33, 110, 86, 111, 15],
+        'PRD00007': [164, 85, 71, 47, 93],
+        'PRD00008': [4, 96, 109, 35, 144],
+        'PRD00009': [67, 21, 198, 168, 186],
+        'PRD00010': [189, 103, 83, 154, 195],
+    }
+    
+    # Generate inventory for all 50 products
     for i, prod in enumerate(products['Product_ID']):
         for j, loc in enumerate(locations):
-            qty = [163, 132, 171, 179, 172, 19, 163, 42, 165, 76][(i*5+j) % 10] if i < 2 else (50 + (i*j) % 150)
+            if prod in base_quantities:
+                qty = base_quantities[prod][j]
+            else:
+                # Generate realistic quantities for other products
+                qty = 50 + ((i + j) * 17) % 150
+            
             inventory_data.append({
                 'Product_ID': prod,
                 'Location': loc,
                 'Quantity_On_Hand': qty,
                 'Last_Updated': '2026-02-20'
             })
+    
     inventory = pd.DataFrame(inventory_data)
     
     # Stock Transactions (150 records)
     transaction_types = ['ADJUSTMENT', 'STOCK IN', 'STOCK OUT']
-    remarks_options = ['Inventory Count', 'Purchase Order', 'Sale', 'System Correction', 'Transfer from Warehouse', 
-                      'Return from Customer', 'Expired', 'Damaged', 'Sample/Display']
+    remarks_options = ['Inventory Count', 'Purchase Order', 'Sale', 'System Correction', 
+                      'Transfer from Warehouse', 'Return from Customer', 'Expired', 
+                      'Damaged', 'Sample/Display']
     
-    transactions = pd.DataFrame({
-        'Transaction_ID': [f'TRX2026{i:04d}' for i in range(150)],
-        'Date': pd.date_range(start='2025-11-01', periods=150, freq='D').tolist(),
-        'Product_ID': [products['Product_ID'].iloc[i % 50] for i in range(150)],
-        'Product_Name': [products['Product_Name'].iloc[i % 50] for i in range(150)],
-        'Transaction_Type': [transaction_types[i % 3] for i in range(150)],
-        'Quantity_Change': [5 if i % 3 == 0 else (-5 if i % 3 == 2 else 10) for i in range(150)],
-        'Location': [locations[i % 5] for i in range(150)],
-        'Reference_Number': [f'REF{1000+i}' for i in range(150)],
-        'Remarks': [remarks_options[i % 9] for i in range(150)]
-    })
+    transactions_data = []
+    for i in range(150):
+        prod_idx = i % 50
+        loc_idx = i % 5
+        txn_type = transaction_types[i % 3]
+        
+        qty = 5 if txn_type == 'ADJUSTMENT' else (10 if txn_type == 'STOCK IN' else -5)
+        
+        transactions_data.append({
+            'Transaction_ID': f'TRX2026{i:04d}',
+            'Date': pd.Timestamp('2025-11-01') + pd.Timedelta(days=i),
+            'Product_ID': products_data[prod_idx][0],
+            'Product_Name': products_data[prod_idx][3],
+            'Transaction_Type': txn_type,
+            'Quantity_Change': qty,
+            'Location': locations[loc_idx],
+            'Reference_Number': f'REF{1000+i}',
+            'Remarks': remarks_options[i % 9]
+        })
+    
+    transactions = pd.DataFrame(transactions_data)
     
     # Supplier Management (10 suppliers)
-    suppliers = pd.DataFrame({
-        'Supplier_ID': [f'SUP{i:03d}' for i in range(1, 11)],
-        'Supplier_Name': [
-            'Hua Ho Trading', 'Soon Lee MegaMart', 'Supasave', 'Seng Huat', 'SKH Group',
-            'Wee Hua Enterprise', 'Pohan Motors', 'D\'Sunlit Supermarket', 'Joyful Mart', 'Al-Falah Corporation'
-        ],
-        'Contact_Person': [
-            'Lim Ah Seng', 'Tan Mei Ling', 'David Wong', 'Michael Chen', 'Steven Khoo',
-            'Jason Wee', 'Ahmad Pohan', 'Hjh Zainab', 'Liew KF', 'Hj Osman'
-        ],
-        'Phone': [
-            '673-2223456', '673-2337890', '673-2456789', '673-2771234', '673-2667890',
-            '673-2884567', '673-2334455', '673-2656789', '673-2781234', '673-2235678'
-        ],
-        'Email': [
-            'purchasing@huaho.com.bn', 'orders@soonlee.com.bn', 'procurement@supasave.com.bn',
-            'sales@senghuat.com.bn', 'trading@skh.com.bn', 'orders@weehua.com.bn',
-            'parts@pohan.com.bn', 'procurement@dsunlit.com.bn', 'supply@joyfulmart.com.bn',
-            'trading@alfalah.com.bn'
-        ],
-        'Address': [
-            'KG Kiulap, Bandar Seri Begawan', 'Gadong Central, BSB', 'Serusop, BSB',
-            'Kuala Belait', 'Tutong Town', 'Seria', 'Beribi Industrial Park', 'Menglait, BSB',
-            'Kiarong', 'Lambak Kanan'
-        ],
-        'Payment_Terms': [
-            'Cash on Delivery', 'Cash on Delivery', 'Net 45', 'Cash on Delivery', 'Net 30',
-            'Net 30', 'Cash on Delivery', 'Cash on Delivery', 'Net 45', 'Cash on Delivery'
-        ]
-    })
+    suppliers_data = [
+        ['SUP001', 'Hua Ho Trading', 'Lim Ah Seng', '673-2223456', 'purchasing@huaho.com.bn', 'KG Kiulap, Bandar Seri Begawan', 'Cash on Delivery'],
+        ['SUP002', 'Soon Lee MegaMart', 'Tan Mei Ling', '673-2337890', 'orders@soonlee.com.bn', 'Gadong Central, BSB', 'Cash on Delivery'],
+        ['SUP003', 'Supasave', 'David Wong', '673-2456789', 'procurement@supasave.com.bn', 'Serusop, BSB', 'Net 45'],
+        ['SUP004', 'Seng Huat', 'Michael Chen', '673-2771234', 'sales@senghuat.com.bn', 'Kuala Belait', 'Cash on Delivery'],
+        ['SUP005', 'SKH Group', 'Steven Khoo', '673-2667890', 'trading@skh.com.bn', 'Tutong Town', 'Net 30'],
+        ['SUP006', 'Wee Hua Enterprise', 'Jason Wee', '673-2884567', 'orders@weehua.com.bn', 'Seria', 'Net 30'],
+        ['SUP007', 'Pohan Motors', 'Ahmad Pohan', '673-2334455', 'parts@pohan.com.bn', 'Beribi Industrial Park', 'Cash on Delivery'],
+        ['SUP008', 'D\'Sunlit Supermarket', 'Hjh Zainab', '673-2656789', 'procurement@dsunlit.com.bn', 'Menglait, BSB', 'Cash on Delivery'],
+        ['SUP009', 'Joyful Mart', 'Liew KF', '673-2781234', 'supply@joyfulmart.com.bn', 'Kiarong', 'Net 45'],
+        ['SUP010', 'Al-Falah Corporation', 'Hj Osman', '673-2235678', 'trading@alfalah.com.bn', 'Lambak Kanan', 'Cash on Delivery'],
+    ]
     
-    # Purchase Orders (40 POs)
-    po_status = ['Confirmed', 'Received', 'Received', 'Received', 'Cancelled', 'Sent', 'Shipped', 'Sent', 'Sent', 'Sent',
-                 'Sent', 'Confirmed', 'Draft', 'Confirmed', 'Shipped', 'Shipped', 'Cancelled', 'Sent', 'Shipped', 'Shipped',
-                 'Cancelled', 'Confirmed', 'Shipped', 'Sent', 'Cancelled', 'Confirmed', 'Confirmed', 'Shipped', 'Shipped',
-                 'Cancelled', 'Received', 'Received', 'Received', 'Received', 'Sent', 'Sent', 'Cancelled', 'Shipped', 'Draft']
+    suppliers = pd.DataFrame(suppliers_data, columns=[
+        'Supplier_ID', 'Supplier_Name', 'Contact_Person', 'Phone', 
+        'Email', 'Address', 'Payment_Terms'
+    ])
     
-    purchase_orders = pd.DataFrame({
-        'PO_Number': [f'PO2026{i:04d}' for i in range(40)],
-        'Supplier_ID': [f'SUP{(i % 10) + 1:03d}' for i in range(40)],
-        'Supplier_Name': [suppliers['Supplier_Name'].iloc[i % 10] for i in range(40)],
-        'Product_ID': [products['Product_ID'].iloc[i % 50] for i in range(40)],
-        'Product_Name': [products['Product_Name'].iloc[i % 50] for i in range(40)],
-        'Ordered_Quantity': [100 + (i * 10) for i in range(40)],
-        'Received_Quantity': [80 + (i * 5) for i in range(40)],
-        'Unit_Cost_BND': [products['Unit_Cost_BND'].iloc[i % 50] for i in range(40)],
-        'Total_Cost_BND': [(100 + (i * 10)) * products['Unit_Cost_BND'].iloc[i % 50] for i in range(40)],
-        'Order_Date': pd.date_range(start='2025-12-01', periods=40, freq='3D').tolist(),
-        'Expected_Date': pd.date_range(start='2025-12-10', periods=40, freq='3D').tolist(),
-        'Order_Status': po_status
-    })
+    # Purchase Orders (40 POs) - FIXED: All arrays now have exactly 40 elements
+    po_status = [
+        'Confirmed', 'Received', 'Received', 'Received', 'Cancelled',  # 5
+        'Sent', 'Shipped', 'Sent', 'Sent', 'Sent',  # 10
+        'Sent', 'Confirmed', 'Draft', 'Confirmed', 'Shipped',  # 15
+        'Shipped', 'Cancelled', 'Sent', 'Shipped', 'Shipped',  # 20
+        'Cancelled', 'Confirmed', 'Shipped', 'Sent', 'Cancelled',  # 25
+        'Confirmed', 'Confirmed', 'Shipped', 'Shipped', 'Cancelled',  # 30
+        'Received', 'Received', 'Received', 'Received', 'Sent',  # 35
+        'Sent', 'Cancelled', 'Shipped', 'Draft', 'Draft'  # 40 - Added extra 'Draft'
+    ]
+    
+    # Verify length
+    assert len(po_status) == 40, f"po_status has {len(po_status)} items, expected 40"
+    
+    purchase_orders_data = []
+    for i in range(40):
+        prod_idx = i % 50
+        supp_idx = i % 10
+        
+        purchase_orders_data.append({
+            'PO_Number': f'PO2026{i:04d}',
+            'Supplier_ID': suppliers_data[supp_idx][0],
+            'Supplier_Name': suppliers_data[supp_idx][1],
+            'Product_ID': products_data[prod_idx][0],
+            'Product_Name': products_data[prod_idx][3],
+            'Ordered_Quantity': 100 + (i * 10),
+            'Received_Quantity': 80 + (i * 5),
+            'Unit_Cost_BND': products_data[prod_idx][5],
+            'Total_Cost_BND': (100 + i * 10) * products_data[prod_idx][5],
+            'Order_Date': pd.Timestamp('2025-12-01') + pd.Timedelta(days=i*3),
+            'Expected_Date': pd.Timestamp('2025-12-10') + pd.Timedelta(days=i*3),
+            'Order_Status': po_status[i]
+        })
+    
+    purchase_orders = pd.DataFrame(purchase_orders_data)
     
     # Stock Alert Monitoring (50 alerts)
-    alerts = pd.DataFrame({
-        'Product_ID': products['Product_ID'],
-        'Product_Name': products['Product_Name'],
-        'Category': products['Category'],
-        'Current_Stock': [817, 465, 574, 614, 573, 355, 460, 388, 640, 724,
-                         470, 400, 212, 644, 371, 838, 670, 565, 302, 392,
-                         394, 391, 540, 536, 578, 465, 432, 412, 616, 594,
-                         303, 614, 354, 519, 322, 501, 408, 542, 492, 578,
-                         505, 221, 635, 372, 574, 410, 366, 641, 343, 444],
-        'Reorder_Level': products['Reorder_Level'],
-        'Alert_Status': ['🟢 NORMAL'] * 50
-    })
+    current_stock = [
+        817, 465, 574, 614, 573, 355, 460, 388, 640, 724,
+        470, 400, 212, 644, 371, 838, 670, 565, 302, 392,
+        394, 391, 540, 536, 578, 465, 432, 412, 616, 594,
+        303, 614, 354, 519, 322, 501, 408, 542, 492, 578,
+        505, 221, 635, 372, 574, 410, 366, 641, 343, 444
+    ]
+    
+    alerts_data = []
+    for i, prod in enumerate(products_data):
+        status = '🟢 NORMAL' if current_stock[i] > prod[7] else ('🟡 WARNING' if current_stock[i] > prod[7] * 0.5 else '🔴 CRITICAL')
+        
+        alerts_data.append({
+            'Product_ID': prod[0],
+            'Product_Name': prod[3],
+            'Category': prod[4],
+            'Current_Stock': current_stock[i],
+            'Reorder_Level': prod[7],
+            'Alert_Status': status
+        })
+    
+    alerts = pd.DataFrame(alerts_data)
     
     return products, inventory, transactions, suppliers, purchase_orders, alerts
 
@@ -351,11 +386,6 @@ def main():
         
         # Merge with product names
         display_df = display_df.merge(products[['Product_ID', 'Product_Name', 'Category']], on='Product_ID')
-        
-        # Calculate totals
-        display_df['Total_Value'] = display_df['Quantity_On_Hand'] * display_df.merge(
-            products[['Product_ID', 'Unit_Cost_BND']], on='Product_ID')['Unit_Cost_BND']
-        
         st.dataframe(display_df[['Product_ID', 'Product_Name', 'Category', 'Location', 'Quantity_On_Hand', 'Last_Updated']], 
                     use_container_width=True)
         
@@ -422,9 +452,9 @@ def main():
         
         # Status overview
         status_counts = purchase_orders['Order_Status'].value_counts()
-        cols = st.columns(len(status_counts))
+        cols = st.columns(min(len(status_counts), 6))
         for i, (status, count) in enumerate(status_counts.items()):
-            with cols[i]:
+            with cols[i % len(cols)]:
                 color = "🔵" if status == "Confirmed" else "🟢" if status == "Received" else "🟡" if status == "Shipped" else "🟠" if status == "Sent" else "⚪"
                 st.metric(f"{color} {status}", count)
         

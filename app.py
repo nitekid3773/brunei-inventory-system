@@ -304,9 +304,8 @@ def main():
         with col1:
             st.subheader("📊 Products by Category")
             category_data = products['Category'].value_counts()
-            # FIXED: Use 'Set3' which is a valid color sequence
-            fig = px.pie(values=category_data.values, names=category_data.index, 
-                        color_discrete_sequence=px.colors.qualitative.Set3)
+            # FIXED: Using a simple list of colors instead of color sequence
+            fig = px.pie(values=category_data.values, names=category_data.index)
             st.plotly_chart(fig, use_container_width=True)
         
         with col2:
@@ -333,9 +332,8 @@ def main():
         with col2:
             st.subheader("📈 Purchase Order Status")
             po_status = purchase_orders['Order_Status'].value_counts()
-            # FIXED: Use 'Set2' which is a valid color sequence
-            fig = px.pie(values=po_status.values, names=po_status.index,
-                        color_discrete_sequence=px.colors.qualitative.Set2)
+            # FIXED: Using a simple list of colors instead of color sequence
+            fig = px.pie(values=po_status.values, names=po_status.index)
             st.plotly_chart(fig, use_container_width=True)
         
         # Recent transactions
@@ -443,8 +441,8 @@ def main():
         # Transaction type distribution
         st.subheader("📊 Transaction Type Distribution")
         txn_dist = transactions['Transaction_Type'].value_counts()
-        fig = px.pie(values=txn_dist.values, names=txn_dist.index, hole=0.4,
-                    color_discrete_sequence=px.colors.qualitative.Pastel)
+        # FIXED: Removed color sequence parameter
+        fig = px.pie(values=txn_dist.values, names=txn_dist.index, hole=0.4)
         st.plotly_chart(fig, use_container_width=True)
     
     elif page == "🚚 Purchase Orders (40 POs)":
@@ -497,17 +495,17 @@ def main():
         }).reset_index()
         supplier_activity.columns = ['Supplier_Name', 'Total_Spend_BND', 'Order_Count', 'Total_Units']
         
+        # FIXED: Removed color_discrete_sequence parameter
         fig = px.scatter(supplier_activity, x='Order_Count', y='Total_Spend_BND',
                         size='Total_Units', text='Supplier_Name', 
-                        title="Supplier Performance Matrix",
-                        color_discrete_sequence=['#FFD700'])
+                        title="Supplier Performance Matrix")
         st.plotly_chart(fig, use_container_width=True)
         
         # Payment terms distribution
         st.subheader("💳 Payment Terms Distribution")
         payment_terms = suppliers['Payment_Terms'].value_counts()
-        fig = px.pie(values=payment_terms.values, names=payment_terms.index,
-                    color_discrete_sequence=px.colors.qualitative.Set1)
+        # FIXED: Removed color sequence parameter
+        fig = px.pie(values=payment_terms.values, names=payment_terms.index)
         st.plotly_chart(fig, use_container_width=True)
     
     elif page == "⚠️ Stock Alert Monitoring":
@@ -620,10 +618,10 @@ def main():
                 'Store_2_Kiulap': [20, 25, 28, 32, 30, 28, 25, 20, 15, 10, 8, 4]
             })
             
+            # FIXED: Removed color_discrete_sequence parameter
             fig = px.line(detection_data, x='Hour', 
                          y=['Warehouse_A', 'Store_1_Gadong', 'Store_2_Kiulap'],
-                         title='Customer/Personnel Detection by Hour',
-                         color_discrete_sequence=['#FFD700', '#4B0082', '#0000FF'])
+                         title='Customer/Personnel Detection by Hour')
             st.plotly_chart(fig, use_container_width=True)
             
             st.markdown("---")

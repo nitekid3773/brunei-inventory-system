@@ -188,20 +188,17 @@ def load_data():
         'Email', 'Address', 'Payment_Terms'
     ])
     
-    # Purchase Orders (40 POs) - FIXED: All arrays now have exactly 40 elements
+    # Purchase Orders (40 POs)
     po_status = [
-        'Confirmed', 'Received', 'Received', 'Received', 'Cancelled',  # 5
-        'Sent', 'Shipped', 'Sent', 'Sent', 'Sent',  # 10
-        'Sent', 'Confirmed', 'Draft', 'Confirmed', 'Shipped',  # 15
-        'Shipped', 'Cancelled', 'Sent', 'Shipped', 'Shipped',  # 20
-        'Cancelled', 'Confirmed', 'Shipped', 'Sent', 'Cancelled',  # 25
-        'Confirmed', 'Confirmed', 'Shipped', 'Shipped', 'Cancelled',  # 30
-        'Received', 'Received', 'Received', 'Received', 'Sent',  # 35
-        'Sent', 'Cancelled', 'Shipped', 'Draft', 'Draft'  # 40 - Added extra 'Draft'
+        'Confirmed', 'Received', 'Received', 'Received', 'Cancelled',
+        'Sent', 'Shipped', 'Sent', 'Sent', 'Sent',
+        'Sent', 'Confirmed', 'Draft', 'Confirmed', 'Shipped',
+        'Shipped', 'Cancelled', 'Sent', 'Shipped', 'Shipped',
+        'Cancelled', 'Confirmed', 'Shipped', 'Sent', 'Cancelled',
+        'Confirmed', 'Confirmed', 'Shipped', 'Shipped', 'Cancelled',
+        'Received', 'Received', 'Received', 'Received', 'Sent',
+        'Sent', 'Cancelled', 'Shipped', 'Draft', 'Draft'
     ]
-    
-    # Verify length
-    assert len(po_status) == 40, f"po_status has {len(po_status)} items, expected 40"
     
     purchase_orders_data = []
     for i in range(40):
@@ -307,8 +304,9 @@ def main():
         with col1:
             st.subheader("📊 Products by Category")
             category_data = products['Category'].value_counts()
+            # FIXED: Use 'Gold' instead of 'Gold_r'
             fig = px.pie(values=category_data.values, names=category_data.index, 
-                        color_discrete_sequence=px.colors.sequential.Gold_r)
+                        color_discrete_sequence=px.colors.sequential.Gold)
             st.plotly_chart(fig, use_container_width=True)
         
         with col2:
@@ -335,8 +333,9 @@ def main():
         with col2:
             st.subheader("📈 Purchase Order Status")
             po_status = purchase_orders['Order_Status'].value_counts()
+            # FIXED: Use 'Plasma' instead of 'Plasma_r'
             fig = px.pie(values=po_status.values, names=po_status.index,
-                        color_discrete_sequence=px.colors.sequential.Plasma_r)
+                        color_discrete_sequence=px.colors.sequential.Plasma)
             st.plotly_chart(fig, use_container_width=True)
         
         # Recent transactions

@@ -270,8 +270,10 @@ def load_initial_data():
     
     transactions_data = []
     for i in range(200):
-        prod = products.sample(1).iloc[0]
-        loc = locations_df.sample(1).iloc[0]
+        prod_idx = i % len(products)
+        prod = products.iloc[prod_idx]
+        loc_idx = i % len(locations_df)
+        loc = locations_df.iloc[loc_idx]
         txn_type = random.choice(transaction_types)
         qty = random.randint(1, 50) if txn_type in ['STOCK_IN', 'TRANSFER'] else -random.randint(1, 20)
         user = random.choice(users)
@@ -284,8 +286,8 @@ def load_initial_data():
             'Product_Name': prod['Product_Name'],
             'SKU': prod['SKU'],
             'Quantity': qty,
-            'Unit_Cost_BND': prod['Unit_Cost_BND'],
-            'Total_Value_BND': abs(qty) * prod['Unit_Cost_BND'],
+            'Unit_Cost_BND': float(prod['Unit_Cost_BND']),
+            'Total_Value_BND': abs(qty) * float(prod['Unit_Cost_BND']),
             'From_Location': loc['Location_ID'] if qty < 0 else None,
             'To_Location': loc['Location_ID'] if qty > 0 else None,
             'Reference_Type': random.choice(['PO', 'SO', 'INV', 'ADJ']),
@@ -306,13 +308,16 @@ def load_initial_data():
     
     purchase_orders_data = []
     for i in range(50):
-        supplier = suppliers.sample(1).iloc[0]
-        product = products.sample(1).iloc[0]
+        supplier_idx = i % len(suppliers)
+        supplier = suppliers.iloc[supplier_idx]
+        product_idx = i % len(products)
+        product = products.iloc[product_idx]
         qty = random.randint(50, 500)
-        unit_cost = product['Unit_Cost_BND'] * random.uniform(0.9, 1.1)
+        unit_cost = float(product['Unit_Cost_BND']) * random.uniform(0.9, 1.1)
         
         po_date = datetime.now() - timedelta(days=random.randint(0, 60))
-        expected_date = po_date + timedelta(days=product['Lead_Time_Days'] + random.randint(0, 5))
+        lead_time = int(product['Lead_Time_Days'])  # Convert to int
+        expected_date = po_date + timedelta(days=lead_time + random.randint(0, 5))
         
         purchase_orders_data.append({
             'PO_Number': f'PO-{datetime.now().strftime("%Y%m")}-{i:04d}',
@@ -1113,11 +1118,11 @@ def show_product_crud():
             with col2:
                 product_options = st.session_state.products_df['Product_Name'].tolist()
                 if st.session_state.selected_product_po:
-                    default_index = product_options.index(
-                        st.session_state.products_df[
-                            st.session_state.products_df['Product_ID'] == st.session_state.selected_product_po
-                        ]['Product_Name'].values[0]
-                    ) if st.session_state.selected_product_po in st.session_state.products_df['Product_ID'].values else 0
+                    product_id = st.session_state.selected_product_po
+                    product_name = st.session_state.products_df[
+                        st.session_state.products_df['Product_ID'] == product_id
+                    ]['Product_Name'].values[0] if product_id in st.session_state.products_df['Product_ID'].values else product_options[0]
+                    default_index = product_options.index(product_name) if product_name in product_options else 0
                 else:
                     default_index = 0
                 
@@ -1153,7 +1158,7 @@ def show_product_crud():
                         st.session_state.locations_df['Location_Name'] == location
                     ]) > 0 else 'LOC001'
                     expected_date = st.date_input("Expected Delivery", 
-                        value=datetime.now() + timedelta(days=product_data['Lead_Time_Days']))
+                        value=datetime.now() + timedelta(days=int(product_data['Lead_Time_Days'])))
                 
                 notes = st.text_area("Notes", placeholder="Additional instructions for supplier...")
                 

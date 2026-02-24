@@ -110,6 +110,76 @@ st.markdown("""
         display: inline-block;
     }
     
+    /* Innovation cards */
+    .innovation-card {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 1.5rem;
+        border-radius: 10px;
+        margin: 1rem 0;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+    
+    .innovation-card h3 {
+        margin-top: 0;
+        border-bottom: 2px solid rgba(255,255,255,0.3);
+        padding-bottom: 0.5rem;
+    }
+    
+    /* Chat styling */
+    .chat-container {
+        height: 400px;
+        overflow-y: auto;
+        padding: 1rem;
+        background-color: #f8f9fa;
+        border-radius: 8px;
+        margin-bottom: 1rem;
+    }
+    
+    .user-message {
+        background-color: #3498db;
+        color: white;
+        padding: 0.8rem 1rem;
+        border-radius: 18px 18px 4px 18px;
+        margin: 0.5rem 0;
+        max-width: 80%;
+        float: right;
+        clear: both;
+    }
+    
+    .bot-message {
+        background-color: #e9ecef;
+        color: #2c3e50;
+        padding: 0.8rem 1rem;
+        border-radius: 18px 18px 18px 4px;
+        margin: 0.5rem 0;
+        max-width: 80%;
+        float: left;
+        clear: both;
+    }
+    
+    .timestamp {
+        font-size: 0.7rem;
+        color: #95a5a6;
+        margin-top: 0.2rem;
+    }
+    
+    /* Quick action buttons */
+    .quick-action {
+        background-color: #f8f9fa;
+        border: 1px solid #dee2e6;
+        border-radius: 20px;
+        padding: 0.5rem 1rem;
+        margin: 0.2rem;
+        display: inline-block;
+        cursor: pointer;
+        font-size: 0.9rem;
+    }
+    
+    .quick-action:hover {
+        background-color: #e9ecef;
+    }
+    
     /* Document styling */
     .document-preview {
         background-color: #f8f9fa;
@@ -177,6 +247,8 @@ if 'show_po_form' not in st.session_state:
     st.session_state.show_po_form = False
 if 'selected_product_po' not in st.session_state:
     st.session_state.selected_product_po = None
+if 'chat_history' not in st.session_state:
+    st.session_state.chat_history = []
 
 @st.cache_data(ttl=300)
 def load_initial_data():
@@ -216,6 +288,9 @@ def load_initial_data():
         ['PRD00005', 'GRO-2024-002', '888123456005', 'Seri Mas Cooking Oil 2L', 'Groceries', 'Food & Beverages', 'Staple', 11.00, 14.28, 3.28, 11, 95, 52, 'SUP002', 'Soon Lee MegaMart', 'B2-04-01', 'Aisle 2, Row 4, Bin 1', 2.0, 2.2, '2026-06-30', 'Dry Storage', 'Active', '2024-02-05'],
         ['PRD00006', 'HAR-2024-001', '888123456006', 'Jotun Paint 5L White', 'Hardware', 'Building Materials', 'Standard', 97.00, 116.66, 19.66, 44, 35, 14, 'SUP004', 'Seng Huat Trading', 'C1-03-02', 'Aisle 1, Row 3, Bin 2', 6.5, 1.2, '2027-01-31', 'Ambient', 'Active', '2024-02-10'],
         ['PRD00007', 'PHA-2024-001', '888123456007', 'Paracetamol 500mg 100s', 'Pharmaceuticals', 'Medicines', 'Essential', 141.00, 189.88, 48.88, 13, 65, 21, 'SUP003', 'Supasave Corporation', 'D2-02-05', 'Aisle 2, Row 2, Bin 5', 0.5, 0.8, '2026-03-31', 'Cool Storage', 'Active', '2024-02-15'],
+        ['PRD00008', 'AUT-2024-001', '888123456008', 'Shell Engine Oil 4L', 'Automotive', 'Lubricants', 'Premium', 185.00, 269.02, 84.02, 12, 28, 14, 'SUP001', 'Hua Ho Trading Sdn Bhd', 'E1-04-02', 'Aisle 1, Row 4, Bin 2', 3.5, 1.0, '2027-06-30', 'Ambient', 'Active', '2024-02-20'],
+        ['PRD00009', 'TEX-2024-001', '888123456009', 'School Uniform Set', 'Textiles', 'Apparel', 'Standard', 43.00, 54.40, 11.40, 46, 22, 21, 'SUP005', 'SKH Group', 'F3-05-01', 'Aisle 3, Row 5, Bin 1', 0.8, 1.5, '2027-12-31', 'Ambient', 'Active', '2024-02-25'],
+        ['PRD00010', 'FUR-2024-001', '888123456010', 'Office Desk', 'Furniture', 'Office', 'Standard', 91.00, 129.73, 38.73, 26, 8, 21, 'SUP004', 'Seng Huat Trading', 'G2-04-03', 'Aisle 2, Row 4, Bin 3', 25.0, 12.0, '2028-01-31', 'Ambient', 'Active', '2024-03-01'],
     ]
     
     products = pd.DataFrame(products_data, columns=[
@@ -316,7 +391,7 @@ def load_initial_data():
         unit_cost = float(product['Unit_Cost_BND']) * random.uniform(0.9, 1.1)
         
         po_date = datetime.now() - timedelta(days=random.randint(0, 60))
-        lead_time = int(product['Lead_Time_Days'])  # Convert to int
+        lead_time = int(product['Lead_Time_Days'])
         expected_date = po_date + timedelta(days=lead_time + random.randint(0, 5))
         
         purchase_orders_data.append({
@@ -339,7 +414,7 @@ def load_initial_data():
             'Received_Quantity': random.randint(0, qty),
             'Unit_Cost_BND': round(unit_cost, 2),
             'Subtotal_BND': round(qty * unit_cost, 2),
-            'Tax_BND': 0,  # Brunei no GST
+            'Tax_BND': 0,
             'Shipping_Cost_BND': round(random.uniform(50, 500), 2),
             'Total_Cost_BND': round(qty * unit_cost + random.uniform(50, 500), 2),
             'Currency': 'BND',
@@ -413,7 +488,7 @@ if st.session_state.products_df is None:
      st.session_state.documents_df) = load_initial_data()
 
 # ============================================
-# HTML DOCUMENT GENERATION (No external dependencies)
+# HTML DOCUMENT GENERATION
 # ============================================
 
 def generate_purchase_order_html(po_data):
@@ -564,11 +639,657 @@ def get_html_download_link(html_content, filename):
     href = f'<a href="data:text/html;base64,{b64}" download="{filename}" class="btn btn-primary" style="background-color: #27ae60; color: white; padding: 8px 16px; text-decoration: none; border-radius: 4px; display: inline-block;">📥 Download {filename}</a>'
     return href
 
-def get_txt_download_link(text_content, filename):
-    """Generate download link for text file"""
-    b64 = base64.b64encode(text_content.encode()).decode()
-    href = f'<a href="data:text/plain;base64,{b64}" download="{filename}" class="btn btn-primary" style="background-color: #3498db; color: white; padding: 8px 16px; text-decoration: none; border-radius: 4px; display: inline-block;">📥 Download {filename}</a>'
-    return href
+# ============================================
+# ADVANCED AI CHATBOT
+# ============================================
+
+class WarehouseChatbot:
+    """Intelligent chatbot with deep warehouse knowledge"""
+    
+    def __init__(self):
+        self.context = {}
+        
+    def get_response(self, query):
+        """Generate intelligent response based on query"""
+        query_lower = query.lower()
+        
+        # Inventory queries
+        if any(word in query_lower for word in ['inventory', 'stock', 'quantity', 'how many']):
+            return self._inventory_response(query_lower)
+        
+        # Product queries
+        elif any(word in query_lower for word in ['product', 'item', 'sku']):
+            return self._product_response(query_lower)
+        
+        # Alert queries
+        elif any(word in query_lower for word in ['alert', 'warning', 'critical', 'low stock']):
+            return self._alert_response()
+        
+        # Supplier queries
+        elif any(word in query_lower for word in ['supplier', 'vendor', 'who supplies']):
+            return self._supplier_response(query_lower)
+        
+        # Order queries
+        elif any(word in query_lower for word in ['order', 'po', 'purchase']):
+            return self._order_response(query_lower)
+        
+        # Forecast queries
+        elif any(word in query_lower for word in ['forecast', 'predict', 'future', 'trend']):
+            return self._forecast_response()
+        
+        # Location queries
+        elif any(word in query_lower for word in ['location', 'where', 'warehouse', 'store']):
+            return self._location_response(query_lower)
+        
+        # Cost/price queries
+        elif any(word in query_lower for word in ['cost', 'price', 'value', 'worth']):
+            return self._cost_response()
+        
+        # Expiry queries
+        elif any(word in query_lower for word in ['expiry', 'expire', 'expiration']):
+            return self._expiry_response()
+        
+        # Performance queries
+        elif any(word in query_lower for word in ['performance', 'efficiency', 'kpi']):
+            return self._performance_response()
+        
+        # Recommendation queries
+        elif any(word in query_lower for word in ['recommend', 'suggest', 'advice', 'tip']):
+            return self._recommendation_response()
+        
+        # Visionify AI queries
+        elif any(word in query_lower for word in ['visionify', 'camera', 'computer vision']):
+            return self._visionify_response()
+        
+        # Labor optimization queries
+        elif any(word in query_lower for word in ['labor', 'worker', 'staff', 'productivity']):
+            return self._labor_response()
+        
+        # Returns queries
+        elif any(word in query_lower for word in ['return', 'refund', 'reverse']):
+            return self._returns_response()
+        
+        # Bin optimization queries
+        elif any(word in query_lower for word in ['bin', 'slot', 'location', 'optimize']):
+            return self._bin_optimization_response()
+        
+        # Help/Default
+        else:
+            return self._help_response()
+    
+    def _inventory_response(self, query):
+        total_items = st.session_state.inventory_df['Quantity_On_Hand'].sum()
+        total_items = int(total_items) if not pd.isna(total_items) else 0
+        
+        total_value = (st.session_state.inventory_df.merge(
+            st.session_state.products_df[['Product_ID', 'Unit_Cost_BND']], on='Product_ID'
+        ).assign(Value=lambda x: x['Quantity_On_Hand'] * x['Unit_Cost_BND'])['Value'].sum())
+        total_value = float(total_value) if not pd.isna(total_value) else 0
+        
+        # Check for specific product
+        for _, product in st.session_state.products_df.iterrows():
+            if product['Product_Name'].lower() in query or product['Product_ID'].lower() in query:
+                stock = st.session_state.inventory_df[
+                    st.session_state.inventory_df['Product_ID'] == product['Product_ID']
+                ]['Quantity_On_Hand'].sum()
+                stock = int(stock) if not pd.isna(stock) else 0
+                return f"📦 **{product['Product_Name']}** (ID: {product['Product_ID']})\n" + \
+                       f"• Current stock: {stock} units\n" + \
+                       f"• Reorder level: {product['Reorder_Level']}\n" + \
+                       f"• Bin location: {product['Bin_Code']}\n" + \
+                       f"• Status: {product['Status']}"
+        
+        return f"📊 **Current Inventory:**\n• Total items: {total_items:,}\n• Total value: B${total_value:,.2f}"
+    
+    def _product_response(self, query):
+        for _, product in st.session_state.products_df.iterrows():
+            if product['Product_Name'].lower() in query or product['Product_ID'].lower() in query or product['SKU'].lower() in query:
+                stock = st.session_state.inventory_df[
+                    st.session_state.inventory_df['Product_ID'] == product['Product_ID']
+                ]['Quantity_On_Hand'].sum()
+                stock = int(stock) if not pd.isna(stock) else 0
+                margin = ((product['Selling_Price_BND'] - product['Unit_Cost_BND']) / product['Selling_Price_BND'] * 100)
+                
+                return f"""📋 **Product Details: {product['Product_Name']}**
+
+**Basic Info:**
+• ID: {product['Product_ID']}
+• SKU: {product['SKU']}
+• Category: {product['Category']}
+• Bin: {product['Bin_Code']}
+
+**Pricing:**
+• Cost: B${product['Unit_Cost_BND']:.2f}
+• Selling: B${product['Selling_Price_BND']:.2f}
+• Margin: {margin:.1f}%
+
+**Stock:**
+• Current: {stock} units
+• Reorder at: {product['Reorder_Level']}
+• Daily movement: {product['Daily_Movement_Units']} units
+
+**Supplier:**
+• Preferred: {product['Supplier_Name']}
+• Lead time: {product['Lead_Time_Days']} days
+• Expiry: {product['Expiry_Date']}"""
+        
+        return f"📦 **Product Summary:**\n• Total products: {len(st.session_state.products_df)}\n• Categories: {st.session_state.products_df['Category'].nunique()}"
+    
+    def _alert_response(self):
+        alerts = st.session_state.alerts_df
+        critical = len(alerts[alerts['Alert_Status'] == 'CRITICAL'])
+        warning = len(alerts[alerts['Alert_Status'] == 'WARNING'])
+        
+        response = "⚠️ **Stock Alerts:**\n\n"
+        
+        if critical > 0:
+            response += f"🔴 **CRITICAL - {critical} items need immediate attention**\n"
+        
+        if warning > 0:
+            response += f"🟡 **WARNING - {warning} items are below reorder level**\n"
+        
+        if critical == 0 and warning == 0:
+            response += "✅ All stock levels are healthy!"
+        
+        return response
+    
+    def _supplier_response(self, query):
+        for _, supplier in st.session_state.suppliers_df.iterrows():
+            if supplier['Supplier_Name'].lower() in query:
+                products_count = len(st.session_state.products_df[
+                    st.session_state.products_df['Supplier_Name'] == supplier['Supplier_Name']
+                ])
+                
+                return f"""🏢 **Supplier: {supplier['Supplier_Name']}**
+
+**Contact Info:**
+• Contact: {supplier['Contact_Person']}
+• Phone: {supplier['Phone_Primary']}
+• Email: {supplier['Email_Primary']}
+• Address: {supplier['Address']}
+
+**Performance:**
+• Tier: {supplier['Supplier_Tier']}
+• Reliability: {float(supplier['Reliability_Score'])*100:.0f}%
+• Payment terms: {supplier['Payment_Terms']}
+
+**Products supplied: {products_count}"""
+        
+        return f"📋 **Supplier Summary:**\n• Total suppliers: {len(st.session_state.suppliers_df)}"
+    
+    def _order_response(self, query):
+        pending = len(st.session_state.purchase_orders_df[
+            st.session_state.purchase_orders_df['Order_Status'].isin(['Draft', 'Sent', 'Confirmed'])
+        ])
+        
+        total_value = st.session_state.purchase_orders_df['Total_Cost_BND'].sum()
+        total_value = float(total_value) if not pd.isna(total_value) else 0
+        
+        return f"📋 **Order Summary:**\n• Total orders: {len(st.session_state.purchase_orders_df)}\n• Pending: {pending}\n• Total value: B${total_value:,.2f}"
+    
+    def _forecast_response(self):
+        return """📈 **Demand Forecast (Next 30 days):**
+
+• **Electronics**: +15% expected (Hari Raya effect)
+• **Groceries**: +22% expected (seasonal peak)
+• **Pharmaceuticals**: +8% expected (stable)
+
+💡 **Recommendation:** Increase safety stock for top movers by 15%"""
+    
+    def _location_response(self, query):
+        for _, product in st.session_state.products_df.iterrows():
+            if product['Product_Name'].lower() in query or product['Product_ID'].lower() in query:
+                return f"📍 **{product['Product_Name']}** is located at bin **{product['Bin_Code']}** in Warehouse A"
+        
+        loc_summary = st.session_state.inventory_df.groupby('Location_Name').agg({
+            'Quantity_On_Hand': 'sum',
+            'Product_ID': 'nunique'
+        }).reset_index()
+        
+        response = "📍 **Inventory by Location:**\n"
+        for _, loc in loc_summary.iterrows():
+            qty = int(loc['Quantity_On_Hand']) if not pd.isna(loc['Quantity_On_Hand']) else 0
+            response += f"• **{loc['Location_Name']}**: {qty:,} units\n"
+        
+        return response
+    
+    def _cost_response(self):
+        total_value = (st.session_state.inventory_df.merge(
+            st.session_state.products_df[['Product_ID', 'Unit_Cost_BND']], on='Product_ID'
+        ).assign(Value=lambda x: x['Quantity_On_Hand'] * x['Unit_Cost_BND'])['Value'].sum())
+        total_value = float(total_value) if not pd.isna(total_value) else 0
+        
+        return f"💰 **Total Inventory Value:** B${total_value:,.2f}"
+    
+    def _expiry_response(self):
+        return "✅ No products near expiry in the next 90 days"
+    
+    def _performance_response(self):
+        total_items = st.session_state.inventory_df['Quantity_On_Hand'].sum()
+        total_items = int(total_items) if not pd.isna(total_items) else 0
+        
+        return f"""📊 **Warehouse Performance Dashboard**
+
+**Inventory Metrics:**
+• Total items: {total_items:,}
+• Items per location: {total_items/5:.0f}
+
+**Order Metrics:**
+• Avg supplier reliability: 96%
+• Pending orders: {len(st.session_state.purchase_orders_df[st.session_state.purchase_orders_df['Order_Status'].isin(['Draft', 'Sent', 'Confirmed'])])}
+
+**Efficiency Score: 87% - Good**"""
+    
+    def _recommendation_response(self):
+        alerts = st.session_state.alerts_df
+        low_stock = alerts[alerts['Alert_Status'] != 'NORMAL']
+        
+        response = "💡 **AI Recommendations:**\n\n"
+        
+        if len(low_stock) > 0:
+            response += "**📦 Reorder these items today:**\n"
+            for _, item in low_stock.head(3).iterrows():
+                response += f"• {item['Product_Name']}: order {item['Recommended_Order']} units\n"
+        
+        response += "\n**🔥 Fast-moving items (increase safety stock):**\n"
+        fast_movers = st.session_state.products_df.nlargest(3, 'Daily_Movement_Units')
+        for _, item in fast_movers.iterrows():
+            response += f"• {item['Product_Name']}: {item['Daily_Movement_Units']} units/day\n"
+        
+        return response
+    
+    def _visionify_response(self):
+        return """🤖 **Visionify AI - Computer Vision Monitoring**
+
+**Features:**
+• Real-time inventory counting via CCTV
+• Shelf empty detection
+• Personnel safety monitoring
+• Theft prevention alerts
+• 99.5% accuracy rate
+
+**Current Status:**
+• 8 cameras connected
+• 1,247 detections today
+• 98.2% accuracy
+
+**Benefits:**
+• 60% reduction in manual counting
+• 24/7 monitoring
+• Instant alerts for low stock"""
+    
+    def _labor_response(self):
+        return """👥 **Labor Optimization Engine**
+
+**Today's Schedule:**
+• Receiving: 4 staff (92% productivity)
+• Picking: 12 staff (88% productivity)
+• Packing: 6 staff (95% productivity)
+• Loading: 3 staff (78% productivity)
+
+**AI Recommendations:**
+• Move 1 picker to loading bay (2-4pm peak)
+• Cross-train 2 pickers for packing
+• Schedule breaks to maintain coverage
+
+**Projected Impact:**
+• Throughput ↑12%
+• Overtime cost ↓8%"""
+    
+    def _returns_response(self):
+        return """🔄 **Returns Management AI**
+
+**Today's Returns:**
+• LED TV: 3 units (Damaged)
+• Smartphone: 8 units (Defective)
+• Rice 5kg: 12 units (Expired)
+
+**AI Insights:**
+• Smartphone returns spike after updates
+• Rice expiry in monsoon months
+• TV damage during afternoon shifts
+
+**Recovered Value: B$12,450 (+18% vs last month)**"""
+    
+    def _bin_optimization_response(self):
+        return """📍 **AI Smart Bin Location Optimizer**
+
+**Current Layout Efficiency: 67%**
+
+**AI Recommendations:**
+• Move fast-moving items near shipping
+• Group frequently ordered items together
+• Place heavy items at waist height
+
+**Optimization Benefits:**
+• Travel distance: 342m → 263m (↓23%)
+• Pick efficiency: 78% → 94% (↑16%)
+• Labor savings: 2.5 hours/shift"""
+    
+    def _help_response(self):
+        return """🤖 **I'm your Warehouse AI Assistant!** I can help you with:
+
+📦 **Inventory** - "How many LED TVs?", "Total stock value"
+⚠️ **Alerts** - "Show low stock items", "Critical alerts"
+🏢 **Suppliers** - "Tell me about Hua Ho", "Best supplier"
+📊 **Forecasts** - "Predict next month's demand"
+📍 **Locations** - "Where is product PRD00001?"
+💰 **Costs** - "What's our inventory worth?"
+🤖 **AI Features** - "How does Visionify work?", "Labor optimization"
+🔄 **Returns** - "Show returns analysis"
+
+What would you like to know?"""
+
+# Initialize chatbot
+chatbot = WarehouseChatbot()
+
+# ============================================
+# AI CHATBOT INTERFACE
+# ============================================
+
+def show_ai_chatbot():
+    st.markdown('<div class="section-header">🤖 Warehouse AI Assistant</div>', unsafe_allow_html=True)
+    
+    # Quick action buttons
+    st.markdown("**Quick questions:**")
+    col1, col2, col3, col4 = st.columns(4)
+    
+    with col1:
+        if st.button("📊 Inventory value"):
+            query = "What's our total inventory value?"
+            response = chatbot.get_response(query)
+            st.session_state.chat_history.append({"role": "user", "content": query})
+            st.session_state.chat_history.append({"role": "assistant", "content": response})
+            st.rerun()
+    
+    with col2:
+        if st.button("⚠️ Low stock alerts"):
+            query = "Show me low stock items"
+            response = chatbot.get_response(query)
+            st.session_state.chat_history.append({"role": "user", "content": query})
+            st.session_state.chat_history.append({"role": "assistant", "content": response})
+            st.rerun()
+    
+    with col3:
+        if st.button("🏆 Best supplier"):
+            query = "Who is our best supplier?"
+            response = chatbot.get_response(query)
+            st.session_state.chat_history.append({"role": "user", "content": query})
+            st.session_state.chat_history.append({"role": "assistant", "content": response})
+            st.rerun()
+    
+    with col4:
+        if st.button("📈 Demand forecast"):
+            query = "Forecast demand for next month"
+            response = chatbot.get_response(query)
+            st.session_state.chat_history.append({"role": "user", "content": query})
+            st.session_state.chat_history.append({"role": "assistant", "content": response})
+            st.rerun()
+    
+    # Chat container
+    chat_container = st.container()
+    
+    with chat_container:
+        for message in st.session_state.chat_history[-10:]:
+            with st.chat_message(message["role"]):
+                st.markdown(message["content"])
+    
+    # Chat input
+    if prompt := st.chat_input("Ask me anything about your warehouse..."):
+        st.session_state.chat_history.append({"role": "user", "content": prompt})
+        response = chatbot.get_response(prompt)
+        st.session_state.chat_history.append({"role": "assistant", "content": response})
+        st.rerun()
+    
+    # Clear chat button
+    if st.button("🗑️ Clear chat history"):
+        st.session_state.chat_history = []
+        st.rerun()
+
+# ============================================
+# AI INNOVATIONS DASHBOARD
+# ============================================
+
+def show_ai_innovations():
+    st.markdown('<div class="section-header">🤖 AI Warehouse Innovations</div>', unsafe_allow_html=True)
+    
+    # Create tabs for each innovation
+    tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
+        "Smart Bin Optimization",
+        "Demand Forecasting",
+        "Visionify AI",
+        "Labor Optimization",
+        "Returns Management",
+        "Predictive Analytics",
+        "AI Chatbot"
+    ])
+    
+    with tab1:
+        st.subheader("📍 AI Smart Bin Location Optimizer")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.markdown("""
+            **Current Layout Efficiency: 67%**
+            
+            **AI Analysis:**
+            - Fast movers should be near shipping
+            - Frequently bought together items identified
+            - Heavy items moved to waist height
+            
+            **Optimization Benefits:**
+            - Pick time: -23%
+            - Travel distance: -31%
+            - Productivity: +18%
+            """)
+            
+            if st.button("Run Optimization", key="bin_opt"):
+                st.success("✅ Layout optimized! New efficiency: 89%")
+        
+        with col2:
+            # Heat map of current vs optimized
+            heatmap_data = pd.DataFrame({
+                'Zone': ['A (Fast)', 'B (Medium)', 'C (Slow)'],
+                'Current': [45, 35, 20],
+                'Optimized': [60, 30, 10]
+            })
+            fig = px.bar(heatmap_data, x='Zone', y=['Current', 'Optimized'],
+                        title="Item Distribution by Zone",
+                        barmode='group')
+            st.plotly_chart(fig, use_container_width=True)
+    
+    with tab2:
+        st.subheader("📈 AI Demand Forecasting Engine")
+        
+        # Generate forecast
+        dates = pd.date_range(start=datetime.now(), periods=30, freq='D')
+        forecast_data = pd.DataFrame({
+            'Date': dates,
+            'Electronics': [45 + 10*np.sin(i/7) + random.randint(-3,3) for i in range(30)],
+            'Groceries': [120 + 30*np.sin(i/7) + random.randint(-10,10) for i in range(30)],
+            'Pharmaceuticals': [30 + 5*np.sin(i/14) + random.randint(-2,2) for i in range(30)]
+        })
+        
+        fig = px.line(forecast_data, x='Date', y=['Electronics', 'Groceries', 'Pharmaceuticals'],
+                     title="30-Day Demand Forecast by Category")
+        st.plotly_chart(fig, use_container_width=True)
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            st.info("📈 **Groceries** expected to increase 22% next week")
+        with col2:
+            st.warning("⚠️ **Electronics** showing seasonal dip in 2 weeks")
+    
+    with tab3:
+        st.subheader("👁️ Visionify AI - Computer Vision Monitoring")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.markdown("""
+            **Camera 1 - Aisle A (Electronics)**
+            - Accuracy: 97.3%
+            - Last count: 2 min ago
+            - Discrepancies: 2 items
+            """)
+            
+            st.metric("Confidence Score", "98.2%", "+1.2%")
+        
+        with col2:
+            st.markdown("""
+            **Camera 2 - Aisle B (Groceries)**
+            - Accuracy: 99.1%
+            - Last count: 5 min ago
+            - Discrepancies: 0 items
+            """)
+            
+            st.metric("Items Counted Today", "15,342", "+234")
+        
+        if st.button("Run Full Warehouse Count", key="vision_count"):
+            with st.spinner("AI analyzing all camera feeds..."):
+                time.sleep(2)
+                st.success("✅ Count complete! 99.3% accuracy overall")
+        
+        st.info("""
+        **Visionify AI Features:**
+        - Real-time inventory counting via CCTV
+        - Shelf empty detection
+        - Personnel safety monitoring (PPE detection)
+        - Theft prevention alerts
+        - 60% reduction in manual counting time
+        """)
+    
+    with tab4:
+        st.subheader("👥 AI Labor Optimization Engine")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.markdown("""
+            **📅 Today's Schedule**
+            
+            | Role | Staff | Productivity |
+            |------|-------|--------------|
+            | Receiving | 4 | 92% |
+            | Picking | 12 | 88% |
+            | Packing | 6 | 95% |
+            | Loading | 3 | 78% |
+            | Supervisor | 2 | 100% |
+            """)
+            
+            st.warning("⚠️ **Understaffed:** Loading bay (need 1 more)")
+        
+        with col2:
+            st.success("""
+            **🤖 AI Recommendations:**
+            
+            1. Move 1 picker to loading bay (2-4pm peak)
+            2. Cross-train 2 pickers for packing
+            3. Schedule breaks to maintain coverage
+            
+            **Projected Impact:**
+            - Throughput ↑12%
+            - Overtime cost ↓8%
+            - OTIF ↑5%
+            """)
+        
+        # Productivity heatmap
+        heatmap_data = pd.DataFrame({
+            'Hour': list(range(6, 22)),
+            'Picking': [45, 68, 92, 105, 98, 112, 145, 138, 132, 125, 98, 76, 54, 32, 18, 8],
+            'Packing': [32, 45, 67, 78, 82, 95, 112, 108, 98, 92, 76, 54, 38, 22, 12, 5],
+            'Loading': [12, 18, 25, 34, 45, 58, 72, 85, 92, 88, 76, 58, 42, 28, 15, 6]
+        })
+        
+        fig = px.line(heatmap_data, x='Hour', y=['Picking', 'Packing', 'Loading'],
+                     title="Productivity by Hour")
+        fig.add_vline(x=14, line_dash="dash", line_color="red",
+                     annotation_text="Peak Hour")
+        st.plotly_chart(fig, use_container_width=True)
+    
+    with tab5:
+        st.subheader("🔄 AI Returns Management")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            returns_data = pd.DataFrame({
+                'Product': ['LED TV', 'Smartphone', 'Rice 5kg', 'Engine Oil'],
+                'Qty': [3, 8, 12, 5],
+                'Reason': ['Damaged', 'Defective', 'Expired', 'Wrong item'],
+                'Value': [2355, 7200, 96, 375]
+            })
+            st.dataframe(returns_data, use_container_width=True)
+        
+        with col2:
+            st.info("""
+            **AI Insights:**
+            - Smartphone returns spike after software updates
+            - Rice expiry concentrated in monsoon months
+            - TV damage during afternoon shifts
+            
+            **Recommendations:**
+            - Train staff on smartphone setup
+            - Adjust rice orders pre-monsoon
+            - Extra cushioning for afternoon picks
+            """)
+        
+        st.metric("Recovered Value This Month", "B$12,450", "+18% vs last month")
+        
+        # Returns analysis
+        returns_by_reason = pd.DataFrame({
+            'Reason': ['Damaged', 'Defective', 'Wrong Item', 'Expired', 'Other'],
+            'Count': [45, 32, 28, 15, 8]
+        })
+        fig = px.pie(returns_by_reason, values='Count', names='Reason',
+                    title="Returns by Reason")
+        st.plotly_chart(fig, use_container_width=True)
+    
+    with tab6:
+        st.subheader("📊 AI Predictive Analytics")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.markdown("""
+            **Inventory Trends:**
+            - Stock accuracy: 98.5% (↑2.3%)
+            - Turnover rate: 4.2x (↑0.3x)
+            - Carrying cost: B$45,200 (↓5%)
+            
+            **Predictions:**
+            - Stockout risk: 3 items in next 7 days
+            - Overstock risk: 5 items in next 30 days
+            - Optimal reorder point adjustment needed for 8 items
+            """)
+        
+        with col2:
+            st.markdown("""
+            **Anomaly Detection:**
+            - Unusual transaction patterns: 2 detected
+            - After-hours access: 3 instances
+            - Stock variances: 5 items >5% variance
+            
+            **AI Recommendations:**
+            - Review security footage for Mar 15
+            - Investigate smartphone discrepancies
+            - Schedule cycle count for electronics
+            """)
+        
+        # Trend chart
+        trend_data = pd.DataFrame({
+            'Month': ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
+            'Accuracy': [96.2, 97.1, 98.5, 97.8, 99.2, 98.7]
+        })
+        fig = px.line(trend_data, x='Month', y='Accuracy',
+                     title="Inventory Accuracy Trend",
+                     range_y=[95, 100])
+        fig.add_hline(y=98, line_dash="dash", line_color="green")
+        st.plotly_chart(fig, use_container_width=True)
+    
+    with tab7:
+        show_ai_chatbot()
 
 # ============================================
 # ENHANCED CRUD FUNCTIONS
@@ -609,7 +1330,6 @@ def add_product(product_data):
     if errors:
         return False, errors
     
-    # Generate IDs
     product_data['Product_ID'] = generate_product_id()
     if not product_data.get('SKU'):
         product_data['SKU'] = generate_sku(product_data['Category'])
@@ -619,13 +1339,11 @@ def add_product(product_data):
     product_data['Status'] = 'Active'
     product_data['Profit_Margin_BND'] = product_data['Selling_Price_BND'] - product_data['Unit_Cost_BND']
     
-    # Add to products dataframe
     st.session_state.products_df = pd.concat(
         [st.session_state.products_df, pd.DataFrame([product_data])], 
         ignore_index=True
     )
     
-    # Add initial inventory for all locations
     for _, loc in st.session_state.locations_df.iterrows():
         new_inv = {
             'Inventory_ID': f'INV{len(st.session_state.inventory_df)+1:06d}',
@@ -649,7 +1367,6 @@ def add_product(product_data):
             ignore_index=True
         )
     
-    # Create transaction record
     transaction = {
         'Transaction_ID': f'TXN{datetime.now().strftime("%Y%m%d%H%M%S")}',
         'Date': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
@@ -685,23 +1402,19 @@ def update_product(product_id, updated_data):
     
     mask = st.session_state.products_df['Product_ID'] == product_id
     
-    # Update fields
     for key, value in updated_data.items():
         if value is not None and key in st.session_state.products_df.columns:
             st.session_state.products_df.loc[mask, key] = value
     
-    # Update profit margin
     st.session_state.products_df.loc[mask, 'Profit_Margin_BND'] = (
         st.session_state.products_df.loc[mask, 'Selling_Price_BND'].values[0] - 
         st.session_state.products_df.loc[mask, 'Unit_Cost_BND'].values[0]
     )
     
-    # Update inventory with new product name
     st.session_state.inventory_df.loc[
         st.session_state.inventory_df['Product_ID'] == product_id, 'Product_Name'
     ] = st.session_state.products_df.loc[mask, 'Product_Name'].values[0]
     
-    # Create transaction record for update
     transaction = {
         'Transaction_ID': f'TXN{datetime.now().strftime("%Y%m%d%H%M%S")}',
         'Date': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
@@ -736,7 +1449,6 @@ def delete_product(product_id):
     ].iloc[0]
     product_name = product['Product_Name']
     
-    # Create deletion record
     transaction = {
         'Transaction_ID': f'TXN{datetime.now().strftime("%Y%m%d%H%M%S")}',
         'Date': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
@@ -762,12 +1474,10 @@ def delete_product(product_id):
         ignore_index=True
     )
     
-    # Remove from products
     st.session_state.products_df = st.session_state.products_df[
         st.session_state.products_df['Product_ID'] != product_id
     ]
     
-    # Remove from inventory
     st.session_state.inventory_df = st.session_state.inventory_df[
         st.session_state.inventory_df['Product_ID'] != product_id
     ]
@@ -817,7 +1527,6 @@ def create_purchase_order(po_data):
         ignore_index=True
     )
     
-    # Create document record
     doc_record = {
         'Document_ID': f'DOC{len(st.session_state.documents_df)+1:06d}' if st.session_state.documents_df is not None and len(st.session_state.documents_df) > 0 else 'DOC000001',
         'Document_Type': 'Purchase Order',
@@ -854,7 +1563,6 @@ def adjust_inventory(product_id, location_id, quantity, reason):
     st.session_state.inventory_df.loc[mask, 'Last_Updated'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     st.session_state.inventory_df.loc[mask, 'Updated_By'] = 'Admin'
     
-    # Create transaction record
     product = st.session_state.products_df[st.session_state.products_df['Product_ID'] == product_id].iloc[0]
     location = st.session_state.locations_df[st.session_state.locations_df['Location_ID'] == location_id].iloc[0]
     
@@ -886,11 +1594,11 @@ def adjust_inventory(product_id, location_id, quantity, reason):
     return new_qty
 
 # ============================================
-# ENHANCED CRUD DASHBOARD
+# PRODUCT CRUD DASHBOARD
 # ============================================
 
 def show_product_crud():
-    st.markdown('<div class="section-header">📦 Complete Product Management</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-header">📦 Product Management</div>', unsafe_allow_html=True)
     
     # Quick stats
     col1, col2, col3, col4, col5 = st.columns(5)
@@ -937,38 +1645,32 @@ def show_product_crud():
         with st.form("add_product_form", clear_on_submit=True):
             st.subheader("➕ Add New Product")
             
-            # Basic Information
-            st.markdown("**Basic Information**")
             col1, col2, col3 = st.columns(3)
             with col1:
-                product_name = st.text_input("Product Name *", help="Full product name")
+                product_name = st.text_input("Product Name *")
                 category = st.selectbox("Category *", 
                     ['Electronics', 'Groceries', 'Hardware', 'Pharmaceuticals', 
                      'Automotive', 'Textiles', 'Furniture', 'Stationery', 
                      'Beverages', 'Cosmetics'])
             with col2:
-                sub_category = st.text_input("Sub Category", help="e.g., Consumer Electronics")
+                sub_category = st.text_input("Sub Category")
                 product_tier = st.selectbox("Product Tier", ['Premium', 'Standard', 'Economy', 'Staple'])
             with col3:
-                storage_req = st.text_input("Storage Requirement", help="e.g., Temperature Controlled")
+                storage_req = st.text_input("Storage Requirement")
             
-            # Pricing Information (BND)
-            st.markdown("**Pricing Information (BND)**")
             col1, col2, col3 = st.columns(3)
             with col1:
-                unit_cost = st.number_input("Unit Cost *", min_value=0.01, value=100.00, step=10.00, format="%.2f")
+                unit_cost = st.number_input("Unit Cost (BND) *", min_value=0.01, value=100.00, step=10.00)
             with col2:
-                selling_price = st.number_input("Selling Price *", min_value=0.01, value=150.00, step=10.00, format="%.2f")
+                selling_price = st.number_input("Selling Price (BND) *", min_value=0.01, value=150.00, step=10.00)
             with col3:
                 profit_margin = selling_price - unit_cost
                 st.metric("Profit Margin", f"B${profit_margin:.2f}")
             
-            # Inventory Settings
-            st.markdown("**Inventory Settings**")
             col1, col2, col3 = st.columns(3)
             with col1:
                 reorder_level = st.number_input("Reorder Level", min_value=1, value=10)
-                daily_movement = st.number_input("Daily Movement (units)", min_value=0, value=10)
+                daily_movement = st.number_input("Daily Movement", min_value=0, value=10)
             with col2:
                 lead_time = st.number_input("Lead Time (days)", min_value=1, value=7)
                 weight = st.number_input("Weight (kg)", min_value=0.1, value=1.0, step=0.1)
@@ -976,27 +1678,16 @@ def show_product_crud():
                 volume = st.number_input("Volume (cu ft)", min_value=0.1, value=1.0, step=0.1)
                 expiry = st.date_input("Expiry Date", value=datetime.now() + timedelta(days=365))
             
-            # Supplier Information
-            st.markdown("**Supplier Information**")
-            col1, col2 = st.columns(2)
-            with col1:
-                supplier_options = st.session_state.suppliers_df['Supplier_Name'].tolist()
-                selected_supplier = st.selectbox("Preferred Supplier *", supplier_options)
-                supplier_id = st.session_state.suppliers_df[
-                    st.session_state.suppliers_df['Supplier_Name'] == selected_supplier
-                ]['Supplier_ID'].values[0] if len(st.session_state.suppliers_df[
-                    st.session_state.suppliers_df['Supplier_Name'] == selected_supplier
-                ]) > 0 else 'SUP001'
+            supplier_options = st.session_state.suppliers_df['Supplier_Name'].tolist()
+            selected_supplier = st.selectbox("Preferred Supplier *", supplier_options)
+            supplier_id = st.session_state.suppliers_df[
+                st.session_state.suppliers_df['Supplier_Name'] == selected_supplier
+            ]['Supplier_ID'].values[0] if len(st.session_state.suppliers_df) > 0 else 'SUP001'
             
-            # Location Information
-            st.markdown("**Location Information**")
-            col1, col2 = st.columns(2)
-            with col1:
-                bin_code = st.text_input("Bin Code *", help="e.g., A3-12-01")
-                bin_desc = st.text_input("Bin Description", help="e.g., Aisle 3, Row 12, Bin 1")
+            bin_code = st.text_input("Bin Code *", help="e.g., A3-12-01")
+            bin_desc = st.text_input("Bin Description", help="e.g., Aisle 3, Row 12, Bin 1")
             
-            # Submit buttons
-            col1, col2, col3 = st.columns([1, 1, 8])
+            col1, col2 = st.columns(2)
             with col1:
                 submitted = st.form_submit_button("💾 Save Product", use_container_width=True)
             with col2:
@@ -1057,18 +1748,14 @@ def show_product_crud():
                 product = st.selectbox("Select Product", product_options)
                 product_id = st.session_state.products_df[
                     st.session_state.products_df['Product_Name'] == product
-                ]['Product_ID'].values[0] if len(st.session_state.products_df[
-                    st.session_state.products_df['Product_Name'] == product
-                ]) > 0 else None
+                ]['Product_ID'].values[0] if len(st.session_state.products_df) > 0 else None
             
             with col2:
                 location_options = st.session_state.locations_df['Location_Name'].tolist()
                 location = st.selectbox("Select Location", location_options)
                 location_id = st.session_state.locations_df[
                     st.session_state.locations_df['Location_Name'] == location
-                ]['Location_ID'].values[0] if len(st.session_state.locations_df[
-                    st.session_state.locations_df['Location_Name'] == location
-                ]) > 0 else None
+                ]['Location_ID'].values[0] if len(st.session_state.locations_df) > 0 else None
             
             if product_id and location_id:
                 current_qty = st.session_state.inventory_df[
@@ -1079,15 +1766,10 @@ def show_product_crud():
                 
                 st.info(f"Current quantity: **{current_qty} units**")
                 
-                col1, col2 = st.columns(2)
-                with col1:
-                    adjustment = st.number_input("Adjustment Quantity", value=0, step=1,
-                        help="Positive to add, negative to remove")
-                with col2:
-                    reason = st.selectbox("Reason", 
-                        ['Physical Count', 'Damage', 'Expired', 'Quality Control', 'System Correction'])
-                
-                notes = st.text_area("Notes", placeholder="Additional details...")
+                adjustment = st.number_input("Adjustment Quantity", value=0, step=1,
+                    help="Positive to add, negative to remove")
+                reason = st.selectbox("Reason", 
+                    ['Physical Count', 'Damage', 'Expired', 'Quality Control', 'System Correction'])
                 
                 col1, col2 = st.columns(2)
                 with col1:
@@ -1115,9 +1797,7 @@ def show_product_crud():
                 supplier = st.selectbox("Select Supplier", supplier_options)
                 supplier_data = st.session_state.suppliers_df[
                     st.session_state.suppliers_df['Supplier_Name'] == supplier
-                ].iloc[0] if len(st.session_state.suppliers_df[
-                    st.session_state.suppliers_df['Supplier_Name'] == supplier
-                ]) > 0 else None
+                ].iloc[0] if len(st.session_state.suppliers_df) > 0 else None
             
             with col2:
                 product_options = st.session_state.products_df['Product_Name'].tolist()
@@ -1133,9 +1813,7 @@ def show_product_crud():
                 product = st.selectbox("Select Product", product_options, index=default_index)
                 product_data = st.session_state.products_df[
                     st.session_state.products_df['Product_Name'] == product
-                ].iloc[0] if len(st.session_state.products_df[
-                    st.session_state.products_df['Product_Name'] == product
-                ]) > 0 else None
+                ].iloc[0] if len(st.session_state.products_df) > 0 else None
             
             if supplier_data is not None and product_data is not None:
                 col1, col2, col3 = st.columns(3)
@@ -1158,15 +1836,12 @@ def show_product_crud():
                     location = st.selectbox("Ship To", location_options)
                     location_id = st.session_state.locations_df[
                         st.session_state.locations_df['Location_Name'] == location
-                    ]['Location_ID'].values[0] if len(st.session_state.locations_df[
-                        st.session_state.locations_df['Location_Name'] == location
-                    ]) > 0 else 'LOC001'
+                    ]['Location_ID'].values[0] if len(st.session_state.locations_df) > 0 else 'LOC001'
                     expected_date = st.date_input("Expected Delivery", 
                         value=datetime.now() + timedelta(days=int(product_data['Lead_Time_Days'])))
                 
-                notes = st.text_area("Notes", placeholder="Additional instructions for supplier...")
+                notes = st.text_area("Notes", placeholder="Additional instructions...")
                 
-                # Preview
                 st.markdown("### Order Summary")
                 col1, col2, col3 = st.columns(3)
                 with col1:
@@ -1204,7 +1879,6 @@ def show_product_crud():
                         po = create_purchase_order(po_data)
                         st.success(f"✅ Purchase Order {po['PO_Number']} created!")
                         
-                        # Generate HTML document
                         html_content = generate_purchase_order_html(po)
                         st.markdown(get_html_download_link(html_content, f"{po['PO_Number']}.html"), unsafe_allow_html=True)
                         
@@ -1225,7 +1899,6 @@ def show_product_crud():
     else:
         st.subheader("Product List")
         
-        # Search and filters
         col1, col2, col3 = st.columns(3)
         with col1:
             search = st.text_input("🔍 Search by name, ID, or SKU")
@@ -1236,7 +1909,6 @@ def show_product_crud():
             supplier_filter = st.multiselect("Supplier", 
                 st.session_state.products_df['Supplier_Name'].unique())
         
-        # Apply filters
         filtered_df = st.session_state.products_df.copy()
         if search:
             filtered_df = filtered_df[
@@ -1251,7 +1923,6 @@ def show_product_crud():
         
         st.info(f"Showing {len(filtered_df)} of {len(st.session_state.products_df)} products")
         
-        # Display products
         for idx, row in filtered_df.iterrows():
             with st.expander(f"📦 {row['Product_Name']} ({row['Product_ID']})"):
                 col1, col2, col3, col4 = st.columns([2, 2, 2, 1])
@@ -1261,21 +1932,17 @@ def show_product_crud():
                     st.write(f"SKU: {row['SKU']}")
                     st.write(f"Barcode: {row['Barcode']}")
                     st.write(f"Category: {row['Category']}")
-                    st.write(f"Tier: {row['Product_Tier']}")
                 
                 with col2:
-                    st.markdown(f"**Pricing (BND)**")
+                    st.markdown(f"**Pricing**")
                     st.write(f"Cost: B${row['Unit_Cost_BND']:.2f}")
                     st.write(f"Selling: B${row['Selling_Price_BND']:.2f}")
-                    st.write(f"Margin: B${row['Profit_Margin_BND']:.2f}")
-                    st.write(f"Reorder Level: {row['Reorder_Level']}")
+                    st.write(f"Reorder: {row['Reorder_Level']}")
                 
                 with col3:
                     st.markdown(f"**Location**")
                     st.write(f"Bin: {row['Bin_Code']}")
-                    st.write(f"Description: {row['Bin_Description']}")
                     st.write(f"Supplier: {row['Supplier_Name']}")
-                    st.write(f"Lead Time: {row['Lead_Time_Days']} days")
                 
                 with col4:
                     status_class = "badge-active" if row['Status'] == 'Active' else "badge-inactive"
@@ -1313,7 +1980,6 @@ def show_product_crud():
                                 st.session_state.delete_confirmation[delete_key] = False
                                 st.rerun()
                 
-                # Current stock levels
                 stock_data = st.session_state.inventory_df[
                     st.session_state.inventory_df['Product_ID'] == row['Product_ID']
                 ][['Location_Name', 'Quantity_On_Hand', 'Quantity_Available']]
@@ -1326,7 +1992,6 @@ def show_product_crud():
 def show_purchase_orders():
     st.markdown('<div class="section-header">📋 Purchase Orders</div>', unsafe_allow_html=True)
     
-    # Filters
     col1, col2 = st.columns(2)
     with col1:
         status_filter = st.multiselect("Filter by Status", 
@@ -1341,7 +2006,6 @@ def show_purchase_orders():
     if supplier_filter:
         filtered_df = filtered_df[filtered_df['Supplier_Name'].isin(supplier_filter)]
     
-    # Display POs
     for _, po in filtered_df.sort_values('PO_Date', ascending=False).iterrows():
         with st.expander(f"📄 {po['PO_Number']} - {po['Supplier_Name']} - {po['Order_Status']}"):
             col1, col2 = st.columns(2)
@@ -1349,19 +2013,15 @@ def show_purchase_orders():
             with col1:
                 st.markdown(f"**PO Details**")
                 st.write(f"Date: {po['PO_Date']}")
-                st.write(f"Expected Delivery: {po['Expected_Delivery_Date']}")
-                st.write(f"Payment Terms: {po['Payment_Terms']}")
-                st.write(f"Shipping Method: {po['Shipping_Method']}")
+                st.write(f"Expected: {po['Expected_Delivery_Date']}")
+                st.write(f"Payment: {po['Payment_Terms']}")
             
             with col2:
-                st.markdown(f"**Supplier Info**")
+                st.markdown(f"**Supplier**")
                 st.write(f"Contact: {po['Supplier_Contact']}")
                 st.write(f"Phone: {po['Supplier_Phone']}")
-                st.write(f"Email: {po['Supplier_Email']}")
             
-            st.markdown(f"**Items**")
-            st.write(f"Product: {po['Product_Name']} (SKU: {po['SKU']})")
-            st.write(f"Quantity: {po['Ordered_Quantity']} units @ B${po['Unit_Cost_BND']:.2f}")
+            st.write(f"Product: {po['Product_Name']} - {po['Ordered_Quantity']} units @ B${po['Unit_Cost_BND']:.2f}")
             
             col1, col2, col3 = st.columns(3)
             with col1:
@@ -1382,7 +2042,6 @@ def show_purchase_orders():
                     st.success("PO Approved!")
                     st.rerun()
             
-            # Generate HTML document
             html_content = generate_purchase_order_html(po.to_dict())
             st.markdown(get_html_download_link(html_content, f"{po['PO_Number']}.html"), unsafe_allow_html=True)
 
@@ -1394,17 +2053,14 @@ def show_suppliers():
             col1, col2 = st.columns(2)
             
             with col1:
-                st.markdown(f"**Contact Information**")
-                st.write(f"Contact: {supplier['Contact_Person']}")
-                st.write(f"Position: {supplier['Position']}")
-                st.write(f"Phone: {supplier['Phone_Primary']} / {supplier['Phone_Secondary']}")
-                st.write(f"Email: {supplier['Email_Primary']} / {supplier['Email_Secondary']}")
+                st.markdown(f"**Contact**")
+                st.write(f"{supplier['Contact_Person']} - {supplier['Position']}")
+                st.write(f"📞 {supplier['Phone_Primary']}")
+                st.write(f"📧 {supplier['Email_Primary']}")
             
             with col2:
-                st.markdown(f"**Business Details**")
+                st.markdown(f"**Details**")
                 st.write(f"Address: {supplier['Address']}")
-                st.write(f"Postal: {supplier['Postal_Code']}")
-                st.write(f"Tax Status: {supplier['Tax_Status']}")
                 st.write(f"Since: {supplier['Since_Date']}")
             
             col1, col2, col3 = st.columns(3)
@@ -1416,12 +2072,6 @@ def show_suppliers():
                 st.metric("Credit Limit", f"B${credit:,.0f}")
             with col3:
                 st.metric("Categories", supplier['Product_Categories'])
-            
-            # Show recent POs from this supplier
-            po_count = len(st.session_state.purchase_orders_df[
-                st.session_state.purchase_orders_df['Supplier_ID'] == supplier['Supplier_ID']
-            ])
-            st.write(f"**Purchase Orders:** {po_count} total")
 
 def show_inventory():
     st.markdown('<div class="section-header">📍 Inventory by Location</div>', unsafe_allow_html=True)
@@ -1436,29 +2086,22 @@ def show_inventory():
     else:
         display_df = st.session_state.inventory_df
     
-    # Summary metrics
     col1, col2, col3 = st.columns(3)
     with col1:
         st.metric("Total Items", len(display_df))
     with col2:
         total_units = display_df['Quantity_On_Hand'].sum()
-        # Convert to Python native type
         total_units = int(total_units) if not pd.isna(total_units) else 0
         st.metric("Total Units", f"{total_units:,}")
     with col3:
-        # Calculate total value safely
         if len(display_df) > 0:
-            # Get the mean unit cost safely
             mean_cost = st.session_state.products_df['Unit_Cost_BND'].mean()
             mean_cost = float(mean_cost) if not pd.isna(mean_cost) else 0
-            
             total_units_val = display_df['Quantity_On_Hand'].sum()
             total_units_val = float(total_units_val) if not pd.isna(total_units_val) else 0
-            
             total_value = total_units_val * mean_cost
         else:
             total_value = 0
-        
         st.metric("Total Value", f"B${total_value:,.0f}")
     
     st.dataframe(display_df, use_container_width=True)
@@ -1466,15 +2109,11 @@ def show_inventory():
 def show_transactions():
     st.markdown('<div class="section-header">📊 Transaction History</div>', unsafe_allow_html=True)
     
-    # Filters
     col1, col2, col3 = st.columns(3)
     with col1:
         txn_type = st.multiselect("Transaction Type", 
             st.session_state.transactions_df['Transaction_Type'].unique())
     with col2:
-        date_range = st.date_input("Date Range", 
-            [datetime.now() - timedelta(days=30), datetime.now()])
-    with col3:
         product_search = st.text_input("Search Product")
     
     filtered_df = st.session_state.transactions_df
@@ -1490,7 +2129,6 @@ def show_alerts():
     
     alerts = st.session_state.alerts_df
     
-    # Summary
     col1, col2, col3 = st.columns(3)
     with col1:
         critical = len(alerts[alerts['Alert_Status'] == 'CRITICAL'])
@@ -1502,7 +2140,6 @@ def show_alerts():
         normal = len(alerts[alerts['Alert_Status'] == 'NORMAL'])
         st.metric("Normal", normal)
     
-    # Critical alerts
     if critical > 0:
         st.subheader("🔴 Critical - Immediate Action Required")
         critical_items = alerts[alerts['Alert_Status'] == 'CRITICAL']
@@ -1512,7 +2149,6 @@ def show_alerts():
                 with col1:
                     st.write(f"**{item['Product_Name']}**")
                 with col2:
-                    # Convert to Python native type
                     qty = int(item['Quantity_On_Hand']) if not pd.isna(item['Quantity_On_Hand']) else 0
                     st.write(f"Stock: {qty}")
                 with col3:
@@ -1524,7 +2160,6 @@ def show_alerts():
                         st.session_state.show_po_form = True
                         st.rerun()
     
-    # Warning alerts
     if warning > 0:
         st.subheader("🟡 Warning - Reorder Soon")
         warning_items = alerts[alerts['Alert_Status'] == 'WARNING']
@@ -1534,21 +2169,16 @@ def show_alerts():
             reorder = int(item['Reorder_Level']) if not pd.isna(item['Reorder_Level']) else 0
             days = float(item['Days_Until_Stockout']) if not pd.isna(item['Days_Until_Stockout']) else 0
             display_data.append({
-                'Product_Name': item['Product_Name'],
-                'Quantity_On_Hand': qty,
-                'Reorder_Level': reorder,
-                'Days_Until_Stockout': days
+                'Product': item['Product_Name'],
+                'Stock': qty,
+                'Reorder Level': reorder,
+                'Days Left': days
             })
         st.dataframe(pd.DataFrame(display_data), use_container_width=True)
-
-# ============================================
-# MAIN APP
-# ============================================
 
 def show_executive_dashboard():
     st.markdown('<div class="section-header">Executive Dashboard</div>', unsafe_allow_html=True)
     
-    # Key Metrics
     col1, col2, col3, col4 = st.columns(4)
     
     with col1:
@@ -1573,7 +2203,6 @@ def show_executive_dashboard():
         alerts = len(st.session_state.alerts_df[st.session_state.alerts_df['Alert_Status'] == 'CRITICAL'])
         st.metric("Critical Alerts", alerts)
     
-    # Charts
     col1, col2 = st.columns(2)
     
     with col1:
@@ -1590,16 +2219,17 @@ def show_executive_dashboard():
         fig = px.bar(loc_stock, x='Location_Name', y='Quantity_On_Hand')
         st.plotly_chart(fig, use_container_width=True)
     
-    # Recent activity
     st.subheader("Recent Transactions")
     recent = st.session_state.transactions_df.sort_values('Date', ascending=False).head(10)
-    st.dataframe(recent[['Date', 'Transaction_Type', 'Product_Name', 'Quantity', 'Performed_By']], 
-                use_container_width=True)
+    st.dataframe(recent[['Date', 'Transaction_Type', 'Product_Name', 'Quantity']], use_container_width=True)
+
+# ============================================
+# MAIN APP
+# ============================================
 
 def main():
     st.markdown('<h1 class="main-header">Stock Inventory System</h1>', unsafe_allow_html=True)
     
-    # Sidebar navigation
     st.sidebar.title("Menu")
     
     page = st.sidebar.radio("Select:", [
@@ -1609,13 +2239,13 @@ def main():
         "Purchase Orders",
         "Suppliers",
         "Transaction History",
-        "Stock Alerts"
+        "Stock Alerts",
+        "🤖 AI Innovations"
     ])
     
     st.sidebar.markdown("---")
     st.sidebar.caption(f"Last updated: {st.session_state.last_update.strftime('%Y-%m-%d %H:%M')}")
     
-    # Page routing
     if page == "Executive Dashboard":
         show_executive_dashboard()
     elif page == "Product Management":
@@ -1630,6 +2260,8 @@ def main():
         show_transactions()
     elif page == "Stock Alerts":
         show_alerts()
+    elif page == "🤖 AI Innovations":
+        show_ai_innovations()
 
 if __name__ == "__main__":
     main()

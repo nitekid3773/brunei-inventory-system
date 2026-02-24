@@ -684,7 +684,6 @@ def update_product(product_id, updated_data):
         return False, errors
     
     mask = st.session_state.products_df['Product_ID'] == product_id
-    old_product = st.session_state.products_df[mask].iloc[0].to_dict()
     
     # Update fields
     for key, value in updated_data.items():
@@ -896,7 +895,8 @@ def show_product_crud():
     # Quick stats
     col1, col2, col3, col4, col5 = st.columns(5)
     with col1:
-        st.metric("Total Products", len(st.session_state.products_df))
+        total_products = len(st.session_state.products_df)
+        st.metric("Total Products", total_products)
     with col2:
         active = len(st.session_state.products_df[st.session_state.products_df['Status'] == 'Active'])
         st.metric("Active", active)
@@ -907,8 +907,11 @@ def show_product_crud():
         suppliers = st.session_state.suppliers_df['Supplier_Name'].nunique()
         st.metric("Suppliers", suppliers)
     with col5:
-        total_value = (st.session_state.inventory_df['Quantity_On_Hand'].sum() * 
-                      st.session_state.products_df['Unit_Cost_BND'].mean())
+        total_inventory = st.session_state.inventory_df['Quantity_On_Hand'].sum()
+        total_inventory = int(total_inventory) if not pd.isna(total_inventory) else 0
+        avg_cost = st.session_state.products_df['Unit_Cost_BND'].mean()
+        avg_cost = float(avg_cost) if not pd.isna(avg_cost) else 0
+        total_value = total_inventory * avg_cost
         st.metric("Inventory Value", f"B${total_value:,.0f}")
     
     # Action buttons
@@ -1072,6 +1075,7 @@ def show_product_crud():
                     (st.session_state.inventory_df['Product_ID'] == product_id) &
                     (st.session_state.inventory_df['Location_ID'] == location_id)
                 ]['Quantity_On_Hand'].values[0]
+                current_qty = int(current_qty) if not pd.isna(current_qty) else 0
                 
                 st.info(f"Current quantity: **{current_qty} units**")
                 
@@ -1361,11 +1365,14 @@ def show_purchase_orders():
             
             col1, col2, col3 = st.columns(3)
             with col1:
-                st.metric("Subtotal", f"B${po['Subtotal_BND']:,.2f}")
+                subtotal = float(po['Subtotal_BND']) if not pd.isna(po['Subtotal_BND']) else 0
+                st.metric("Subtotal", f"B${subtotal:,.2f}")
             with col2:
-                st.metric("Shipping", f"B${po['Shipping_Cost_BND']:,.2f}")
+                shipping = float(po['Shipping_Cost_BND']) if not pd.isna(po['Shipping_Cost_BND']) else 0
+                st.metric("Shipping", f"B${shipping:,.2f}")
             with col3:
-                st.metric("Total", f"B${po['Total_Cost_BND']:,.2f}")
+                total = float(po['Total_Cost_BND']) if not pd.isna(po['Total_Cost_BND']) else 0
+                st.metric("Total", f"B${total:,.2f}")
             
             if po['Order_Status'] == 'Draft':
                 if st.button(f"✅ Approve PO", key=f"approve_{po['PO_Number']}"):
@@ -1402,9 +1409,11 @@ def show_suppliers():
             
             col1, col2, col3 = st.columns(3)
             with col1:
-                st.metric("Reliability", f"{supplier['Reliability_Score']*100:.0f}%")
+                reliability = float(supplier['Reliability_Score']) if not pd.isna(supplier['Reliability_Score']) else 0
+                st.metric("Reliability", f"{reliability*100:.0f}%")
             with col2:
-                st.metric("Credit Limit", f"B${supplier['Credit_Limit']}")
+                credit = float(supplier['Credit_Limit']) if not pd.isna(supplier['Credit_Limit']) else 0
+                st.metric("Credit Limit", f"B${credit:,.0f}")
             with col3:
                 st.metric("Categories", supplier['Product_Categories'])
             
@@ -1433,10 +1442,23 @@ def show_inventory():
         st.metric("Total Items", len(display_df))
     with col2:
         total_units = display_df['Quantity_On_Hand'].sum()
+        # Convert to Python native type
+        total_units = int(total_units) if not pd.isna(total_units) else 0
         st.metric("Total Units", f"{total_units:,}")
     with col3:
-        total_value = (display_df['Quantity_On_Hand'] * 
-                      st.session_state.products_df['Unit_Cost_BND'].mean())
+        # Calculate total value safely
+        if len(display_df) > 0:
+            # Get the mean unit cost safely
+            mean_cost = st.session_state.products_df['Unit_Cost_BND'].mean()
+            mean_cost = float(mean_cost) if not pd.isna(mean_cost) else 0
+            
+            total_units_val = display_df['Quantity_On_Hand'].sum()
+            total_units_val = float(total_units_val) if not pd.isna(total_units_val) else 0
+            
+            total_value = total_units_val * mean_cost
+        else:
+            total_value = 0
+        
         st.metric("Total Value", f"B${total_value:,.0f}")
     
     st.dataframe(display_df, use_container_width=True)
@@ -1490,9 +1512,12 @@ def show_alerts():
                 with col1:
                     st.write(f"**{item['Product_Name']}**")
                 with col2:
-                    st.write(f"Stock: {item['Quantity_On_Hand']}")
+                    # Convert to Python native type
+                    qty = int(item['Quantity_On_Hand']) if not pd.isna(item['Quantity_On_Hand']) else 0
+                    st.write(f"Stock: {qty}")
                 with col3:
-                    st.write(f"Reorder: {item['Reorder_Level']}")
+                    reorder = int(item['Reorder_Level']) if not pd.isna(item['Reorder_Level']) else 0
+                    st.write(f"Reorder: {reorder}")
                 with col4:
                     if st.button(f"Create PO", key=f"po_{item['Product_ID']}"):
                         st.session_state.selected_product_po = item['Product_ID']
@@ -1503,7 +1528,18 @@ def show_alerts():
     if warning > 0:
         st.subheader("🟡 Warning - Reorder Soon")
         warning_items = alerts[alerts['Alert_Status'] == 'WARNING']
-        st.dataframe(warning_items[['Product_Name', 'Quantity_On_Hand', 'Reorder_Level', 'Days_Until_Stockout']])
+        display_data = []
+        for _, item in warning_items.iterrows():
+            qty = int(item['Quantity_On_Hand']) if not pd.isna(item['Quantity_On_Hand']) else 0
+            reorder = int(item['Reorder_Level']) if not pd.isna(item['Reorder_Level']) else 0
+            days = float(item['Days_Until_Stockout']) if not pd.isna(item['Days_Until_Stockout']) else 0
+            display_data.append({
+                'Product_Name': item['Product_Name'],
+                'Quantity_On_Hand': qty,
+                'Reorder_Level': reorder,
+                'Days_Until_Stockout': days
+            })
+        st.dataframe(pd.DataFrame(display_data), use_container_width=True)
 
 # ============================================
 # MAIN APP
@@ -1521,12 +1557,16 @@ def show_executive_dashboard():
     
     with col2:
         total_inventory = st.session_state.inventory_df['Quantity_On_Hand'].sum()
+        total_inventory = int(total_inventory) if not pd.isna(total_inventory) else 0
         st.metric("Items in Stock", f"{total_inventory:,}")
     
     with col3:
-        total_value = (st.session_state.inventory_df.merge(
+        inventory_val = st.session_state.inventory_df.merge(
             st.session_state.products_df[['Product_ID', 'Unit_Cost_BND']], on='Product_ID'
-        ).assign(Value=lambda x: x['Quantity_On_Hand'] * x['Unit_Cost_BND'])['Value'].sum())
+        )
+        inventory_val['Value'] = inventory_val['Quantity_On_Hand'] * inventory_val['Unit_Cost_BND']
+        total_value = inventory_val['Value'].sum()
+        total_value = float(total_value) if not pd.isna(total_value) else 0
         st.metric("Inventory Value", f"B${total_value:,.0f}")
     
     with col4:

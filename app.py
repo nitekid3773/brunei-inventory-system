@@ -11,22 +11,9 @@ import io
 import base64
 from collections import defaultdict
 import warnings
+import subprocess
+import sys
 warnings.filterwarnings('ignore')
-
-# Try to import computer vision libraries with fallback
-CV_AVAILABLE = False
-try:
-    import cv2
-    from ultralytics import YOLO
-    import supervision as sv
-    from roboflow import Roboflow
-    CV_AVAILABLE = True
-except ImportError as e:
-    st.warning(f"""
-    ⚠️ Some computer vision features are unavailable. 
-    Install required packages: `pip install opencv-python-headless ultralytics supervision roboflow`
-    Error: {str(e)}
-    """)
 
 # Page configuration
 st.set_page_config(
@@ -84,8 +71,65 @@ st.markdown("""
         border-radius: 8px;
         margin: 1rem 0;
     }
+    
+    .error-box {
+        background-color: #f8d7da;
+        border: 1px solid #f5c6cb;
+        color: #721c24;
+        padding: 1rem;
+        border-radius: 8px;
+        margin: 1rem 0;
+    }
+    
+    .code-block {
+        background-color: #f8f9fa;
+        border: 1px solid #e9ecef;
+        border-radius: 4px;
+        padding: 1rem;
+        font-family: monospace;
+        margin: 1rem 0;
+    }
 </style>
 """, unsafe_allow_html=True)
+
+# ============================================
+# COMPUTER VISION DETECTION WITH MULTIPLE BACKENDS
+# ============================================
+
+CV_AVAILABLE = False
+CV_BACKEND = None
+CV_ERROR = None
+
+# Try different CV backends
+try:
+    # Try OpenCV first
+    import cv2
+    CV_AVAILABLE = True
+    CV_BACKEND = "opencv"
+    st.sidebar.success(f"✅ Vision: {CV_BACKEND}")
+except ImportError as e:
+    CV_ERROR = str(e)
+    try:
+        # Try Pillow as fallback for basic image processing
+        from PIL import Image
+        CV_AVAILABLE = True
+        CV_BACKEND = "pillow"
+        st.sidebar.info(f"📷 Vision: {CV_BACKEND} (basic)")
+    except ImportError:
+        CV_ERROR = "No image processing libraries available"
+
+# Try YOLO/ML libraries
+try:
+    from ultralytics import YOLO
+    YOLO_AVAILABLE = True
+except ImportError:
+    YOLO_AVAILABLE = False
+
+try:
+    import supervision as sv
+    SUPERVISION_AVAILABLE = True
+except ImportError:
+    SUPERVISION_AVAILABLE = False
 
 # Initialize session state
 if 'products_df' not in st.session_state:
@@ -106,19 +150,8 @@ if 'documents_df' not in st.session_state:
     st.session_state.documents_df = None
 if 'last_update' not in st.session_state:
     st.session_state.last_update = datetime.now()
-
-# Vision system state (only if CV is available)
-if CV_AVAILABLE:
-    if 'vision_enabled' not in st.session_state:
-        st.session_state.vision_enabled = False
-    if 'camera_active' not in st.session_state:
-        st.session_state.camera_active = False
-    if 'person_count' not in st.session_state:
-        st.session_state.person_count = 0
-    if 'object_counts' not in st.session_state:
-        st.session_state.object_counts = {}
-    if 'detection_history' not in st.session_state:
-        st.session_state.detection_history = []
+if 'vision_demo_mode' not in st.session_state:
+    st.session_state.vision_demo_mode = False
 
 @st.cache_data(ttl=300)
 def load_initial_data():
@@ -175,14 +208,14 @@ def load_initial_data():
     inventory_data = []
     inventory_counter = 1
     for i, prod in enumerate(products['Product_ID']):
-        for j, loc in locations_df.iterrows():
+        for j, loc in enumerate(locations_df.iterrows()):
             qty = 50 + ((i + j) * 17) % 150
             inventory_data.append({
                 'Inventory_ID': f'INV{inventory_counter:06d}',
                 'Product_ID': prod,
                 'Product_Name': products.iloc[i]['Product_Name'],
-                'Location_ID': loc['Location_ID'],
-                'Location_Name': loc['Location_Name'],
+                'Location_ID': loc[1]['Location_ID'],
+                'Location_Name': loc[1]['Location_Name'],
                 'Quantity_On_Hand': qty,
                 'Last_Updated': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
             })
@@ -254,120 +287,348 @@ if st.session_state.products_df is None:
      st.session_state.documents_df) = load_initial_data()
 
 # ============================================
-# SIMPLE VISION SYSTEM (FALLBACK IF CV NOT AVAILABLE)
+# VISION SYSTEM WITH MULTIPLE BACKENDS
 # ============================================
 
-def show_vision_info():
-    """Show information about vision features when CV is not available"""
+def check_system_dependencies():
+    """Check and display system dependency status"""
+    st.markdown("### System Dependencies Check")
+    
+    deps = {
+        "libGL.so.1": "OpenGL library",
+        "libgomp.so.1": "OpenMP library",
+        "libgcc_s.so.1": "GCC runtime"
+    }
+    
+    for dep, name in deps.items:
+        try:
+            result = subprocess.run(['ldconfig', '-p'], capture_output=True, text=True)
+            if dep in result.stdout:
+                st.success(f"✅ {name}: Found")
+            else:
+                st.warning(f"⚠️ {name}: Not found")
+        except:
+            st.warning(f"⚠️ {name}: Could not check")
+
+def show_installation_guide():
+    """Show detailed installation guide"""
     st.markdown("""
-    <div class="warning-box">
-        <h3>🔧 Computer Vision Features Currently Unavailable</h3>
-        <p>The computer vision module requires additional packages that are not installed in this environment.</p>
-        
-        <h4>To enable vision features, install:</h4>
-        <pre><code>pip install opencv-python-headless ultralytics supervision roboflow</code></pre>
-        
-        <h4>Or add to requirements.txt:</h4>
-        <pre><code>opencv-python-headless>=4.8.0
-ultralytics>=8.0.0
-supervision>=0.18.0</code></pre>
-        
-        <h4>Alternative: Use Demo Mode</h4>
-        <p>You can still explore the vision interface in demo mode with simulated data.</p>
+    <div class="error-box">
+        <h3>🔧 System Dependencies Missing</h3>
+        <p>The error <code>libGL.so.1: cannot open shared object file</code> indicates missing system libraries.</p>
+    </div>
+    
+    <h4>For Streamlit Cloud Deployment:</h4>
+    <div class="code-block">
+        # Create a packages.txt file in your repository root with:
+        libgl1-mesa-glx
+        libglib2.0-0
+        libsm6
+        libxext6
+        libxrender-dev
+        libgomp1
+        libgcc-s1
+    </div>
+    
+    <h4>For Local Development (Ubuntu/Debian):</h4>
+    <div class="code-block">
+        sudo apt-get update
+        sudo apt-get install -y libgl1-mesa-glx libglib2.0-0 libsm6 libxext6 libxrender-dev libgomp1
+    </div>
+    
+    <h4>For Local Development (macOS):</h4>
+    <div class="code-block">
+        brew install libomp
+        brew install glib
+    </div>
+    
+    <h4>Alternative: Use Headless OpenCV</h4>
+    <div class="code-block">
+        pip uninstall opencv-python
+        pip install opencv-python-headless
     </div>
     """, unsafe_allow_html=True)
+
+class SimpleVisionSystem:
+    """Simplified vision system using PIL if OpenCV is not available"""
     
-    if st.button("🎮 Try Demo Mode"):
-        st.session_state.vision_demo_mode = True
-        st.rerun()
+    def __init__(self):
+        self.backend = CV_BACKEND
+        self.frame_count = 0
+        
+    def process_frame(self, frame_data=None):
+        """Process a frame or generate simulated data"""
+        if self.backend == "opencv":
+            return self._process_with_opencv()
+        else:
+            return self._generate_simulated_data()
+    
+    def _process_with_opencv(self):
+        """Process with OpenCV (simulated for now)"""
+        import cv2
+        # This would contain actual OpenCV code
+        # For now, return simulated data
+        return self._generate_simulated_data()
+    
+    def _generate_simulated_data(self):
+        """Generate simulated detection data"""
+        self.frame_count += 1
+        
+        # Simulate varying counts
+        person_count = 5 + int(3 * np.sin(self.frame_count / 10)) + random.randint(-2, 2)
+        person_count = max(0, person_count)
+        
+        object_counts = {
+            'person': person_count,
+            'forklift': random.randint(0, 3),
+            'pallet': random.randint(5, 15),
+            'box': random.randint(20, 50)
+        }
+        
+        return {
+            'timestamp': datetime.now(),
+            'person_count': person_count,
+            'object_counts': object_counts,
+            'total_objects': sum(object_counts.values()),
+            'confidence': random.uniform(0.85, 0.98)
+        }
 
 def show_vision_demo():
-    """Show simulated vision demo"""
+    """Show enhanced vision demo with simulated data"""
     st.markdown('<div class="success-box">📹 Vision Demo Mode - Simulated Data</div>', unsafe_allow_html=True)
     
-    col1, col2, col3, col4 = st.columns(4)
+    # Initialize vision system
+    if 'vision_system' not in st.session_state:
+        st.session_state.vision_system = SimpleVisionSystem()
+    if 'detection_history' not in st.session_state:
+        st.session_state.detection_history = []
     
+    # Controls
+    col1, col2, col3 = st.columns(3)
     with col1:
-        st.metric("People Detected", random.randint(3, 12))
+        if st.button("🎮 Start Simulation"):
+            st.session_state.simulation_running = True
     with col2:
-        st.metric("Objects Detected", random.randint(15, 45))
+        if st.button("⏹️ Stop Simulation"):
+            st.session_state.simulation_running = False
     with col3:
-        st.metric("Accuracy", f"{random.uniform(92, 99):.1f}%")
-    with col4:
-        st.metric("FPS", random.randint(15, 30))
+        update_rate = st.slider("Update Rate (Hz)", 1, 10, 5)
     
-    # Simulated feed
-    st.markdown("### Simulated Camera Feed")
+    # Main display area
+    feed_placeholder = st.empty()
+    stats_cols = st.columns(4)
+    chart_placeholder = st.empty()
     
-    # Create a simple visualization
+    # Run simulation
+    if st.session_state.get('simulation_running', False):
+        for _ in range(update_rate * 2):  # Run for 2 seconds worth of frames
+            # Get simulated data
+            data = st.session_state.vision_system.process_frame()
+            st.session_state.detection_history.append(data)
+            
+            # Keep last 100 records
+            if len(st.session_state.detection_history) > 100:
+                st.session_state.detection_history = st.session_state.detection_history[-100:]
+            
+            # Update display
+            with feed_placeholder.container():
+                # Create a visual representation
+                fig = create_vision_visualization(data)
+                st.plotly_chart(fig, use_container_width=True)
+            
+            # Update metrics
+            with stats_cols[0]:
+                st.metric("People", data['person_count'])
+            with stats_cols[1]:
+                st.metric("Total Objects", data['total_objects'])
+            with stats_cols[2]:
+                st.metric("Confidence", f"{data['confidence']*100:.1f}%")
+            with stats_cols[3]:
+                st.metric("FPS", update_rate)
+            
+            # Update history chart
+            if len(st.session_state.detection_history) > 1:
+                hist_df = pd.DataFrame(st.session_state.detection_history)
+                fig2 = px.line(hist_df, y=['person_count', 'total_objects'], 
+                              title="Detection History")
+                chart_placeholder.plotly_chart(fig2, use_container_width=True)
+            
+            time.sleep(1/update_rate)
+            
+            if not st.session_state.get('simulation_running', False):
+                break
+    
+    # Export option
+    if st.button("📥 Export Detection Data"):
+        if st.session_state.detection_history:
+            df = pd.DataFrame(st.session_state.detection_history)
+            csv = df.to_csv(index=False)
+            st.download_button(
+                "Download CSV",
+                csv,
+                file_name=f"vision_data_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                mime="text/csv"
+            )
+
+def create_vision_visualization(data):
+    """Create a visualization of vision data"""
     import plotly.graph_objects as go
     
-    # Create a grid for the "camera feed"
-    grid_size = 20
-    z = np.random.rand(grid_size, grid_size) * 100
+    # Create a grid heatmap
+    grid_size = 30
+    heatmap_data = np.zeros((grid_size, grid_size))
     
-    # Add some "detections"
-    for _ in range(random.randint(3, 8)):
+    # Add "detections" based on object counts
+    for _ in range(data['total_objects']):
         x = random.randint(0, grid_size-1)
         y = random.randint(0, grid_size-1)
-        z[x, y] = 200 + random.randint(0, 50)
+        heatmap_data[x, y] += random.uniform(0.5, 1.0)
+    
+    # Add people with higher intensity
+    for _ in range(data['person_count']):
+        x = random.randint(0, grid_size-1)
+        y = random.randint(0, grid_size-1)
+        heatmap_data[x, y] += random.uniform(1.5, 2.0)
     
     fig = go.Figure(data=go.Heatmap(
-        z=z,
+        z=heatmap_data,
         colorscale='Viridis',
-        showscale=False
+        showscale=False,
+        hovertemplate='X: %{x}<br>Y: %{y}<br>Intensity: %{z:.2f}<extra></extra>'
     ))
     
     fig.update_layout(
         height=400,
-        title="Simulated Heatmap View",
-        xaxis=dict(showticklabels=False),
-        yaxis=dict(showticklabels=False)
+        title=f"Live Detection View - {data['timestamp'].strftime('%H:%M:%S')}",
+        xaxis=dict(showticklabels=False, showgrid=False),
+        yaxis=dict(showticklabels=False, showgrid=False),
+        margin=dict(l=0, r=0, t=40, b=0)
     )
     
-    st.plotly_chart(fig, use_container_width=True)
+    # Add annotations for object types
+    annotations = []
+    y_pos = 0.95
+    for obj, count in data['object_counts'].items():
+        if count > 0:
+            annotations.append(dict(
+                x=0.02,
+                y=y_pos,
+                xref="paper",
+                yref="paper",
+                text=f"• {obj}: {count}",
+                showarrow=False,
+                font=dict(size=12, color="white"),
+                bgcolor="rgba(0,0,0,0.5)"
+            ))
+            y_pos -= 0.05
     
-    # Detection log
-    st.markdown("### Detection Log")
-    log_data = []
-    for i in range(5):
-        log_data.append({
-            'Time': datetime.now().strftime('%H:%M:%S'),
-            'Event': random.choice(['Person detected', 'Object detected', 'Motion detected']),
-            'Confidence': f"{random.uniform(0.85, 0.99):.2f}"
-        })
+    fig.update_layout(annotations=annotations)
     
-    st.dataframe(pd.DataFrame(log_data), use_container_width=True)
+    return fig
+
+def show_vision_system():
+    """Main vision system interface"""
+    st.markdown('<div class="section-header">👁️ AI Vision System</div>', unsafe_allow_html=True)
     
-    if st.button("Exit Demo Mode"):
-        st.session_state.vision_demo_mode = False
-        st.rerun()
+    # Check if we're in demo mode
+    if st.session_state.get('vision_demo_mode', False):
+        show_vision_demo()
+        if st.button("Exit Demo Mode"):
+            st.session_state.vision_demo_mode = False
+            st.rerun()
+        return
+    
+    # Show current status
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.markdown("### System Status")
+        if CV_AVAILABLE:
+            st.success(f"✅ Computer Vision: Available (Backend: {CV_BACKEND})")
+            
+            if YOLO_AVAILABLE:
+                st.success("✅ YOLO: Available")
+            else:
+                st.warning("⚠️ YOLO: Not installed (for object detection)")
+            
+            if SUPERVISION_AVAILABLE:
+                st.success("✅ Supervision: Available")
+            else:
+                st.warning("⚠️ Supervision: Not installed (for tracking)")
+        else:
+            st.error(f"❌ Computer Vision: Not available")
+            st.code(f"Error: {CV_ERROR}")
+    
+    with col2:
+        st.markdown("### Quick Actions")
+        if st.button("🎮 Try Demo Mode (No Camera Needed)"):
+            st.session_state.vision_demo_mode = True
+            st.rerun()
+        
+        if st.button("🔧 Show Installation Guide"):
+            st.session_state.show_install_guide = True
+    
+    # Show installation guide if requested
+    if st.session_state.get('show_install_guide', False):
+        show_installation_guide()
+        if st.button("Hide Guide"):
+            st.session_state.show_install_guide = False
+            st.rerun()
+    
+    # System dependencies check
+    with st.expander("🔍 System Dependencies Check"):
+        check_system_dependencies()
+    
+    # If OpenCV is available but missing system libs, show fix
+    if CV_ERROR and 'libGL' in str(CV_ERROR):
+        st.markdown("""
+        <div class="warning-box">
+            <h4>📦 Missing System Libraries</h4>
+            <p>Create a <code>packages.txt</code> file in your repository root with:</p>
+            <pre><code>libgl1-mesa-glx
+libglib2.0-0
+libsm6
+libxext6
+libxrender-dev
+libgomp1</code></pre>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # Download button for packages.txt
+        packages_content = """libgl1-mesa-glx
+libglib2.0-0
+libsm6
+libxext6
+libxrender-dev
+libgomp1"""
+        
+        st.download_button(
+            "📥 Download packages.txt",
+            packages_content,
+            file_name="packages.txt",
+            mime="text/plain"
+        )
 
 # ============================================
-# AI CHATBOT (Your existing chatbot)
+# AI CHATBOT
 # ============================================
 
 class WarehouseChatbot:
-    """Intelligent chatbot with deep warehouse knowledge"""
-    
     def __init__(self):
-        self.context = {}
-        
+        pass
+    
     def get_response(self, query):
-        """Generate intelligent response based on query"""
         query_lower = query.lower()
         
-        # Simple responses for demo
         if 'inventory' in query_lower:
             total_items = st.session_state.inventory_df['Quantity_On_Hand'].sum()
             return f"📊 Current total inventory: {int(total_items):,} units"
         elif 'product' in query_lower:
             return f"📦 Total products: {len(st.session_state.products_df)}"
         elif 'alert' in query_lower or 'low stock' in query_lower:
-            alerts = st.session_state.alerts_df
-            if len(alerts) > 0:
-                critical = len(alerts[alerts['Status'] == 'CRITICAL'])
-                return f"⚠️ {critical} critical alerts, {len(alerts)-critical} warnings"
+            if st.session_state.alerts_df is not None and len(st.session_state.alerts_df) > 0:
+                critical = len(st.session_state.alerts_df[st.session_state.alerts_df['Status'] == 'CRITICAL'])
+                return f"⚠️ {critical} critical alerts, {len(st.session_state.alerts_df)-critical} warnings"
             else:
                 return "✅ No active alerts"
         elif 'supplier' in query_lower:
@@ -383,31 +644,23 @@ class WarehouseChatbot:
 What would you like to know?"""
 
 def show_ai_chatbot():
-    """Display AI chatbot interface"""
     st.markdown('<div class="section-header">🤖 Warehouse AI Assistant</div>', unsafe_allow_html=True)
     
-    # Initialize chatbot
     if 'chatbot' not in st.session_state:
         st.session_state.chatbot = WarehouseChatbot()
     if 'chat_history' not in st.session_state:
         st.session_state.chat_history = []
     
-    # Display chat history
     for message in st.session_state.chat_history[-10:]:
         with st.chat_message(message["role"]):
             st.markdown(message["content"])
     
-    # Chat input
     if prompt := st.chat_input("Ask me about your warehouse..."):
         st.session_state.chat_history.append({"role": "user", "content": prompt})
-        
-        # Get response
         response = st.session_state.chatbot.get_response(prompt)
         st.session_state.chat_history.append({"role": "assistant", "content": response})
-        
         st.rerun()
     
-    # Clear button
     if st.button("Clear Chat"):
         st.session_state.chat_history = []
         st.rerun()
@@ -433,7 +686,6 @@ def show_executive_dashboard():
         alerts = len(st.session_state.alerts_df) if st.session_state.alerts_df is not None else 0
         st.metric("Active Alerts", alerts)
     
-    # Charts
     col1, col2 = st.columns(2)
     
     with col1:
@@ -453,10 +705,8 @@ def show_executive_dashboard():
 def show_product_crud():
     st.markdown('<div class="section-header">📦 Product Management</div>', unsafe_allow_html=True)
     
-    # Search and filter
     search = st.text_input("🔍 Search products", "")
     
-    # Display products
     df = st.session_state.products_df
     if search:
         df = df[df['Product_Name'].str.contains(search, case=False) | 
@@ -511,7 +761,6 @@ def show_alerts():
 def show_ai_innovations():
     st.markdown('<div class="section-header">🤖 AI Warehouse Innovations</div>', unsafe_allow_html=True)
     
-    # Create tabs
     tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
         "👁️ Vision System",
         "📍 Smart Bin Optimization",
@@ -522,16 +771,7 @@ def show_ai_innovations():
     ])
     
     with tab1:
-        if CV_AVAILABLE:
-            st.info("✅ Computer Vision libraries are available!")
-            # Here you would integrate the full vision system
-            st.markdown("### Vision System Ready")
-            st.metric("Status", "Online")
-        else:
-            if st.session_state.get('vision_demo_mode', False):
-                show_vision_demo()
-            else:
-                show_vision_info()
+        show_vision_system()
     
     with tab2:
         st.subheader("📍 Smart Bin Optimization")
@@ -546,7 +786,6 @@ def show_ai_innovations():
     with tab3:
         st.subheader("📈 Demand Forecasting")
         
-        # Simple forecast
         dates = pd.date_range(start=datetime.now(), periods=30, freq='D')
         forecast = pd.DataFrame({
             'Date': dates,
@@ -576,7 +815,7 @@ def show_ai_innovations():
         - ✅ Inventory Management
         - ✅ Purchase Orders
         - ✅ Supplier Directory
-        - ⏳ Computer Vision (Pending installation)
+        - ⏳ Computer Vision (Requires setup)
         - ⏳ Barcode Scanning (Coming soon)
         """)
 
@@ -585,9 +824,8 @@ def show_ai_innovations():
 # ============================================
 
 def main():
-    st.markdown('<h1 class="main-header">📦 Stock Inventory System</h1>', unsafe_allow_html=True)
+    st.markdown('<h1 class="main-header">📦 Stock Inventory System with AI Vision</h1>', unsafe_allow_html=True)
     
-    # Sidebar
     with st.sidebar:
         st.title("Menu")
         
@@ -606,13 +844,14 @@ def main():
         
         # Status indicators
         if CV_AVAILABLE:
-            st.success("✅ Vision: Available")
+            st.success(f"✅ Vision: {CV_BACKEND}")
         else:
-            st.warning("⚠️ Vision: Not installed")
+            st.warning("⚠️ Vision: Limited")
+            if st.button("🎮 Try Demo"):
+                st.session_state.vision_demo_mode = True
         
         st.caption(f"Last updated: {datetime.now().strftime('%Y-%m-%d %H:%M')}")
     
-    # Page routing
     if page == "Executive Dashboard":
         show_executive_dashboard()
     elif page == "Product Management":

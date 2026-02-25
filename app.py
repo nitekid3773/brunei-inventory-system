@@ -106,7 +106,6 @@ try:
     import cv2
     CV_AVAILABLE = True
     CV_BACKEND = "opencv"
-    st.sidebar.success(f"✅ Vision: {CV_BACKEND}")
 except ImportError as e:
     CV_ERROR = str(e)
     try:
@@ -114,7 +113,6 @@ except ImportError as e:
         from PIL import Image
         CV_AVAILABLE = True
         CV_BACKEND = "pillow"
-        st.sidebar.info(f"📷 Vision: {CV_BACKEND} (basic)")
     except ImportError:
         CV_ERROR = "No image processing libraries available"
 
@@ -152,6 +150,10 @@ if 'last_update' not in st.session_state:
     st.session_state.last_update = datetime.now()
 if 'vision_demo_mode' not in st.session_state:
     st.session_state.vision_demo_mode = False
+if 'simulation_running' not in st.session_state:
+    st.session_state.simulation_running = False
+if 'show_install_guide' not in st.session_state:
+    st.session_state.show_install_guide = False
 
 @st.cache_data(ttl=300)
 def load_initial_data():
@@ -300,15 +302,16 @@ def check_system_dependencies():
         "libgcc_s.so.1": "GCC runtime"
     }
     
-    for dep, name in deps.items:
+    for dep, name in deps.items():
         try:
+            # Try to run ldconfig to check for libraries
             result = subprocess.run(['ldconfig', '-p'], capture_output=True, text=True)
             if dep in result.stdout:
                 st.success(f"✅ {name}: Found")
             else:
                 st.warning(f"⚠️ {name}: Not found")
-        except:
-            st.warning(f"⚠️ {name}: Could not check")
+        except Exception as e:
+            st.warning(f"⚠️ {name}: Could not check ({str(e)})")
 
 def show_installation_guide():
     """Show detailed installation guide"""
@@ -365,7 +368,6 @@ class SimpleVisionSystem:
     
     def _process_with_opencv(self):
         """Process with OpenCV (simulated for now)"""
-        import cv2
         # This would contain actual OpenCV code
         # For now, return simulated data
         return self._generate_simulated_data()
@@ -392,83 +394,6 @@ class SimpleVisionSystem:
             'total_objects': sum(object_counts.values()),
             'confidence': random.uniform(0.85, 0.98)
         }
-
-def show_vision_demo():
-    """Show enhanced vision demo with simulated data"""
-    st.markdown('<div class="success-box">📹 Vision Demo Mode - Simulated Data</div>', unsafe_allow_html=True)
-    
-    # Initialize vision system
-    if 'vision_system' not in st.session_state:
-        st.session_state.vision_system = SimpleVisionSystem()
-    if 'detection_history' not in st.session_state:
-        st.session_state.detection_history = []
-    
-    # Controls
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        if st.button("🎮 Start Simulation"):
-            st.session_state.simulation_running = True
-    with col2:
-        if st.button("⏹️ Stop Simulation"):
-            st.session_state.simulation_running = False
-    with col3:
-        update_rate = st.slider("Update Rate (Hz)", 1, 10, 5)
-    
-    # Main display area
-    feed_placeholder = st.empty()
-    stats_cols = st.columns(4)
-    chart_placeholder = st.empty()
-    
-    # Run simulation
-    if st.session_state.get('simulation_running', False):
-        for _ in range(update_rate * 2):  # Run for 2 seconds worth of frames
-            # Get simulated data
-            data = st.session_state.vision_system.process_frame()
-            st.session_state.detection_history.append(data)
-            
-            # Keep last 100 records
-            if len(st.session_state.detection_history) > 100:
-                st.session_state.detection_history = st.session_state.detection_history[-100:]
-            
-            # Update display
-            with feed_placeholder.container():
-                # Create a visual representation
-                fig = create_vision_visualization(data)
-                st.plotly_chart(fig, use_container_width=True)
-            
-            # Update metrics
-            with stats_cols[0]:
-                st.metric("People", data['person_count'])
-            with stats_cols[1]:
-                st.metric("Total Objects", data['total_objects'])
-            with stats_cols[2]:
-                st.metric("Confidence", f"{data['confidence']*100:.1f}%")
-            with stats_cols[3]:
-                st.metric("FPS", update_rate)
-            
-            # Update history chart
-            if len(st.session_state.detection_history) > 1:
-                hist_df = pd.DataFrame(st.session_state.detection_history)
-                fig2 = px.line(hist_df, y=['person_count', 'total_objects'], 
-                              title="Detection History")
-                chart_placeholder.plotly_chart(fig2, use_container_width=True)
-            
-            time.sleep(1/update_rate)
-            
-            if not st.session_state.get('simulation_running', False):
-                break
-    
-    # Export option
-    if st.button("📥 Export Detection Data"):
-        if st.session_state.detection_history:
-            df = pd.DataFrame(st.session_state.detection_history)
-            csv = df.to_csv(index=False)
-            st.download_button(
-                "Download CSV",
-                csv,
-                file_name=f"vision_data_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
-                mime="text/csv"
-            )
 
 def create_vision_visualization(data):
     """Create a visualization of vision data"""
@@ -526,6 +451,87 @@ def create_vision_visualization(data):
     
     return fig
 
+def show_vision_demo():
+    """Show enhanced vision demo with simulated data"""
+    st.markdown('<div class="success-box">📹 Vision Demo Mode - Simulated Data</div>', unsafe_allow_html=True)
+    
+    # Initialize vision system
+    if 'vision_system' not in st.session_state:
+        st.session_state.vision_system = SimpleVisionSystem()
+    if 'detection_history' not in st.session_state:
+        st.session_state.detection_history = []
+    
+    # Controls
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        if st.button("🎮 Start Simulation"):
+            st.session_state.simulation_running = True
+    with col2:
+        if st.button("⏹️ Stop Simulation"):
+            st.session_state.simulation_running = False
+    with col3:
+        update_rate = st.slider("Update Rate (Hz)", 1, 10, 5)
+    
+    # Main display area
+    feed_placeholder = st.empty()
+    stats_cols = st.columns(4)
+    chart_placeholder = st.empty()
+    
+    # Run simulation
+    if st.session_state.get('simulation_running', False):
+        # Create a placeholder for the loop
+        simulation_placeholder = st.empty()
+        
+        while st.session_state.simulation_running:
+            # Get simulated data
+            data = st.session_state.vision_system.process_frame()
+            st.session_state.detection_history.append(data)
+            
+            # Keep last 100 records
+            if len(st.session_state.detection_history) > 100:
+                st.session_state.detection_history = st.session_state.detection_history[-100:]
+            
+            # Update display
+            with feed_placeholder.container():
+                # Create a visual representation
+                fig = create_vision_visualization(data)
+                st.plotly_chart(fig, use_container_width=True)
+            
+            # Update metrics
+            with stats_cols[0]:
+                st.metric("People", data['person_count'])
+            with stats_cols[1]:
+                st.metric("Total Objects", data['total_objects'])
+            with stats_cols[2]:
+                st.metric("Confidence", f"{data['confidence']*100:.1f}%")
+            with stats_cols[3]:
+                st.metric("FPS", update_rate)
+            
+            # Update history chart
+            if len(st.session_state.detection_history) > 1:
+                hist_df = pd.DataFrame(st.session_state.detection_history)
+                fig2 = px.line(hist_df, y=['person_count', 'total_objects'], 
+                              title="Detection History")
+                chart_placeholder.plotly_chart(fig2, use_container_width=True)
+            
+            # Check if we should stop
+            if not st.session_state.simulation_running:
+                break
+            
+            time.sleep(1/update_rate)
+    
+    # Export option
+    if st.button("📥 Export Detection Data"):
+        if st.session_state.detection_history:
+            df = pd.DataFrame(st.session_state.detection_history)
+            csv = df.to_csv(index=False)
+            st.download_button(
+                "Download CSV",
+                csv,
+                file_name=f"vision_data_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                mime="text/csv"
+            )
+
 def show_vision_system():
     """Main vision system interface"""
     st.markdown('<div class="section-header">👁️ AI Vision System</div>', unsafe_allow_html=True)
@@ -535,6 +541,7 @@ def show_vision_system():
         show_vision_demo()
         if st.button("Exit Demo Mode"):
             st.session_state.vision_demo_mode = False
+            st.session_state.simulation_running = False
             st.rerun()
         return
     
@@ -557,7 +564,8 @@ def show_vision_system():
                 st.warning("⚠️ Supervision: Not installed (for tracking)")
         else:
             st.error(f"❌ Computer Vision: Not available")
-            st.code(f"Error: {CV_ERROR}")
+            if CV_ERROR:
+                st.code(f"Error: {CV_ERROR}")
     
     with col2:
         st.markdown("### Quick Actions")
@@ -566,14 +574,11 @@ def show_vision_system():
             st.rerun()
         
         if st.button("🔧 Show Installation Guide"):
-            st.session_state.show_install_guide = True
+            st.session_state.show_install_guide = not st.session_state.show_install_guide
     
     # Show installation guide if requested
     if st.session_state.get('show_install_guide', False):
         show_installation_guide()
-        if st.button("Hide Guide"):
-            st.session_state.show_install_guide = False
-            st.rerun()
     
     # System dependencies check
     with st.expander("🔍 System Dependencies Check"):
@@ -651,16 +656,21 @@ def show_ai_chatbot():
     if 'chat_history' not in st.session_state:
         st.session_state.chat_history = []
     
-    for message in st.session_state.chat_history[-10:]:
-        with st.chat_message(message["role"]):
-            st.markdown(message["content"])
+    # Display chat history
+    chat_container = st.container()
+    with chat_container:
+        for message in st.session_state.chat_history[-10:]:
+            with st.chat_message(message["role"]):
+                st.markdown(message["content"])
     
+    # Chat input
     if prompt := st.chat_input("Ask me about your warehouse..."):
         st.session_state.chat_history.append({"role": "user", "content": prompt})
         response = st.session_state.chatbot.get_response(prompt)
         st.session_state.chat_history.append({"role": "assistant", "content": response})
         st.rerun()
     
+    # Clear button
     if st.button("Clear Chat"):
         st.session_state.chat_history = []
         st.rerun()
@@ -852,6 +862,7 @@ def main():
         
         st.caption(f"Last updated: {datetime.now().strftime('%Y-%m-%d %H:%M')}")
     
+    # Page routing
     if page == "Executive Dashboard":
         show_executive_dashboard()
     elif page == "Product Management":

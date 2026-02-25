@@ -54,6 +54,44 @@ st.markdown("""
         margin: 0.5rem 0;
     }
     
+    .metric-value {
+        font-size: 1.8rem;
+        font-weight: 600;
+        color: #1e3c72;
+    }
+    
+    .metric-label {
+        font-size: 0.9rem;
+        color: #7f8c8d;
+    }
+    
+    .badge-critical {
+        background-color: #e74c3c;
+        color: white;
+        padding: 0.2rem 0.8rem;
+        border-radius: 12px;
+        font-size: 0.8rem;
+        display: inline-block;
+    }
+    
+    .badge-warning {
+        background-color: #f39c12;
+        color: white;
+        padding: 0.2rem 0.8rem;
+        border-radius: 12px;
+        font-size: 0.8rem;
+        display: inline-block;
+    }
+    
+    .badge-normal {
+        background-color: #27ae60;
+        color: white;
+        padding: 0.2rem 0.8rem;
+        border-radius: 12px;
+        font-size: 0.8rem;
+        display: inline-block;
+    }
+    
     .warning-box {
         background-color: #fff3cd;
         border: 1px solid #ffeeba;
@@ -92,43 +130,6 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# ============================================
-# COMPUTER VISION DETECTION WITH MULTIPLE BACKENDS
-# ============================================
-
-CV_AVAILABLE = False
-CV_BACKEND = None
-CV_ERROR = None
-
-# Try different CV backends
-try:
-    # Try OpenCV first
-    import cv2
-    CV_AVAILABLE = True
-    CV_BACKEND = "opencv"
-except ImportError as e:
-    CV_ERROR = str(e)
-    try:
-        # Try Pillow as fallback for basic image processing
-        from PIL import Image
-        CV_AVAILABLE = True
-        CV_BACKEND = "pillow"
-    except ImportError:
-        CV_ERROR = "No image processing libraries available"
-
-# Try YOLO/ML libraries
-try:
-    from ultralytics import YOLO
-    YOLO_AVAILABLE = True
-except ImportError:
-    YOLO_AVAILABLE = False
-
-try:
-    import supervision as sv
-    SUPERVISION_AVAILABLE = True
-except ImportError:
-    SUPERVISION_AVAILABLE = False
-
 # Initialize session state
 if 'products_df' not in st.session_state:
     st.session_state.products_df = None
@@ -154,6 +155,36 @@ if 'simulation_running' not in st.session_state:
     st.session_state.simulation_running = False
 if 'show_install_guide' not in st.session_state:
     st.session_state.show_install_guide = False
+
+# Computer vision availability check
+CV_AVAILABLE = False
+CV_BACKEND = None
+CV_ERROR = None
+
+try:
+    import cv2
+    CV_AVAILABLE = True
+    CV_BACKEND = "opencv"
+except ImportError as e:
+    CV_ERROR = str(e)
+    try:
+        from PIL import Image
+        CV_AVAILABLE = True
+        CV_BACKEND = "pillow"
+    except ImportError:
+        CV_ERROR = "No image processing libraries available"
+
+try:
+    from ultralytics import YOLO
+    YOLO_AVAILABLE = True
+except ImportError:
+    YOLO_AVAILABLE = False
+
+try:
+    import supervision as sv
+    SUPERVISION_AVAILABLE = True
+except ImportError:
+    SUPERVISION_AVAILABLE = False
 
 @st.cache_data(ttl=300)
 def load_initial_data():
@@ -206,18 +237,18 @@ def load_initial_data():
         'Status', 'Date_Added'
     ])
     
-    # Inventory (simplified for this version)
+    # Inventory
     inventory_data = []
     inventory_counter = 1
     for i, prod in enumerate(products['Product_ID']):
-        for j, loc in enumerate(locations_df.iterrows()):
+        for j, (_, loc) in enumerate(locations_df.iterrows()):
             qty = 50 + ((i + j) * 17) % 150
             inventory_data.append({
                 'Inventory_ID': f'INV{inventory_counter:06d}',
                 'Product_ID': prod,
                 'Product_Name': products.iloc[i]['Product_Name'],
-                'Location_ID': loc[1]['Location_ID'],
-                'Location_Name': loc[1]['Location_Name'],
+                'Location_ID': loc['Location_ID'],
+                'Location_Name': loc['Location_Name'],
                 'Quantity_On_Hand': qty,
                 'Last_Updated': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
             })
@@ -225,7 +256,7 @@ def load_initial_data():
     
     inventory = pd.DataFrame(inventory_data)
     
-    # Transactions (simplified)
+    # Transactions
     transactions_data = []
     for i in range(50):
         prod_idx = i % len(products)
@@ -241,7 +272,7 @@ def load_initial_data():
     
     transactions = pd.DataFrame(transactions_data)
     
-    # Purchase Orders (simplified)
+    # Purchase Orders
     purchase_orders_data = []
     for i in range(20):
         supplier_idx = i % len(suppliers)
@@ -262,7 +293,7 @@ def load_initial_data():
     
     # Alerts
     alerts_data = []
-    for i, prod in products.iterrows():
+    for _, prod in products.iterrows():
         stock = random.randint(0, 50)
         if stock < prod['Reorder_Level']:
             alerts_data.append({
@@ -289,7 +320,114 @@ if st.session_state.products_df is None:
      st.session_state.documents_df) = load_initial_data()
 
 # ============================================
-# VISION SYSTEM WITH MULTIPLE BACKENDS
+# PAGE FUNCTIONS
+# ============================================
+
+def show_executive_dashboard():
+    st.markdown('<div class="section-header">📊 Executive Dashboard</div>', unsafe_allow_html=True)
+    
+    col1, col2, col3, col4 = st.columns(4)
+    
+    with col1:
+        st.metric("Total Products", len(st.session_state.products_df))
+    with col2:
+        total_inventory = st.session_state.inventory_df['Quantity_On_Hand'].sum()
+        st.metric("Items in Stock", f"{int(total_inventory):,}")
+    with col3:
+        total_value = total_inventory * st.session_state.products_df['Unit_Cost_BND'].mean()
+        st.metric("Inventory Value", f"B${total_value:,.0f}")
+    with col4:
+        alerts = len(st.session_state.alerts_df) if st.session_state.alerts_df is not None else 0
+        st.metric("Active Alerts", alerts)
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.subheader("Stock by Category")
+        cat_stock = st.session_state.inventory_df.merge(
+            st.session_state.products_df[['Product_ID', 'Category']], on='Product_ID'
+        ).groupby('Category')['Quantity_On_Hand'].sum().reset_index()
+        if len(cat_stock) > 0:
+            fig = px.pie(cat_stock, values='Quantity_On_Hand', names='Category')
+            st.plotly_chart(fig, use_container_width=True)
+    
+    with col2:
+        st.subheader("Stock by Location")
+        loc_stock = st.session_state.inventory_df.groupby('Location_Name')['Quantity_On_Hand'].sum().reset_index()
+        if len(loc_stock) > 0:
+            fig = px.bar(loc_stock, x='Location_Name', y='Quantity_On_Hand')
+            st.plotly_chart(fig, use_container_width=True)
+
+def show_product_crud():
+    st.markdown('<div class="section-header">📦 Product Management</div>', unsafe_allow_html=True)
+    
+    search = st.text_input("🔍 Search products", "")
+    
+    df = st.session_state.products_df.copy()
+    if search:
+        df = df[df['Product_Name'].str.contains(search, case=False) | 
+                df['Product_ID'].str.contains(search, case=False)]
+    
+    st.dataframe(df[['Product_ID', 'Product_Name', 'Category', 'Unit_Cost_BND', 'Selling_Price_BND', 'Status']], 
+                 use_container_width=True)
+
+def show_inventory():
+    st.markdown('<div class="section-header">📍 Inventory by Location</div>', unsafe_allow_html=True)
+    
+    location = st.selectbox("Select Location", 
+        ['All'] + st.session_state.locations_df['Location_Name'].tolist())
+    
+    if location != 'All':
+        display_df = st.session_state.inventory_df[
+            st.session_state.inventory_df['Location_Name'] == location
+        ]
+    else:
+        display_df = st.session_state.inventory_df
+    
+    st.dataframe(display_df, use_container_width=True)
+
+def show_purchase_orders():
+    st.markdown('<div class="section-header">📋 Purchase Orders</div>', unsafe_allow_html=True)
+    
+    if st.session_state.purchase_orders_df is not None and len(st.session_state.purchase_orders_df) > 0:
+        st.dataframe(st.session_state.purchase_orders_df, use_container_width=True)
+    else:
+        st.info("No purchase orders found")
+
+def show_suppliers():
+    st.markdown('<div class="section-header">🏢 Suppliers</div>', unsafe_allow_html=True)
+    
+    if st.session_state.suppliers_df is not None and len(st.session_state.suppliers_df) > 0:
+        st.dataframe(st.session_state.suppliers_df, use_container_width=True)
+    else:
+        st.info("No suppliers found")
+
+def show_transactions():
+    st.markdown('<div class="section-header">📊 Transactions</div>', unsafe_allow_html=True)
+    
+    if st.session_state.transactions_df is not None and len(st.session_state.transactions_df) > 0:
+        st.dataframe(st.session_state.transactions_df, use_container_width=True)
+    else:
+        st.info("No transactions found")
+
+def show_alerts():
+    st.markdown('<div class="section-header">⚠️ Stock Alerts</div>', unsafe_allow_html=True)
+    
+    if st.session_state.alerts_df is not None and len(st.session_state.alerts_df) > 0:
+        for _, alert in st.session_state.alerts_df.iterrows():
+            color = "badge-critical" if alert['Status'] == 'CRITICAL' else "badge-warning"
+            st.markdown(f"""
+            <div class="info-card">
+                <span class="{color}">{alert['Status']}</span>
+                <h3>{alert['Product_Name']}</h3>
+                <p>Current Stock: {alert['Current_Stock']} | Reorder Level: {alert['Reorder_Level']}</p>
+            </div>
+            """, unsafe_allow_html=True)
+    else:
+        st.info("✅ No active alerts")
+
+# ============================================
+# VISION SYSTEM
 # ============================================
 
 def check_system_dependencies():
@@ -304,14 +442,13 @@ def check_system_dependencies():
     
     for dep, name in deps.items():
         try:
-            # Try to run ldconfig to check for libraries
             result = subprocess.run(['ldconfig', '-p'], capture_output=True, text=True)
             if dep in result.stdout:
                 st.success(f"✅ {name}: Found")
             else:
                 st.warning(f"⚠️ {name}: Not found")
         except Exception as e:
-            st.warning(f"⚠️ {name}: Could not check ({str(e)})")
+            st.warning(f"⚠️ {name}: Could not check")
 
 def show_installation_guide():
     """Show detailed installation guide"""
@@ -339,44 +476,35 @@ def show_installation_guide():
         sudo apt-get install -y libgl1-mesa-glx libglib2.0-0 libsm6 libxext6 libxrender-dev libgomp1
     </div>
     
-    <h4>For Local Development (macOS):</h4>
-    <div class="code-block">
-        brew install libomp
-        brew install glib
-    </div>
-    
     <h4>Alternative: Use Headless OpenCV</h4>
     <div class="code-block">
         pip uninstall opencv-python
         pip install opencv-python-headless
     </div>
     """, unsafe_allow_html=True)
+    
+    packages_content = """libgl1-mesa-glx
+libglib2.0-0
+libsm6
+libxext6
+libxrender-dev
+libgomp1"""
+    
+    st.download_button(
+        "📥 Download packages.txt",
+        packages_content,
+        file_name="packages.txt",
+        mime="text/plain"
+    )
 
 class SimpleVisionSystem:
-    """Simplified vision system using PIL if OpenCV is not available"""
-    
     def __init__(self):
         self.backend = CV_BACKEND
         self.frame_count = 0
         
-    def process_frame(self, frame_data=None):
-        """Process a frame or generate simulated data"""
-        if self.backend == "opencv":
-            return self._process_with_opencv()
-        else:
-            return self._generate_simulated_data()
-    
-    def _process_with_opencv(self):
-        """Process with OpenCV (simulated for now)"""
-        # This would contain actual OpenCV code
-        # For now, return simulated data
-        return self._generate_simulated_data()
-    
-    def _generate_simulated_data(self):
-        """Generate simulated detection data"""
+    def process_frame(self):
         self.frame_count += 1
         
-        # Simulate varying counts
         person_count = 5 + int(3 * np.sin(self.frame_count / 10)) + random.randint(-2, 2)
         person_count = max(0, person_count)
         
@@ -397,19 +525,14 @@ class SimpleVisionSystem:
 
 def create_vision_visualization(data):
     """Create a visualization of vision data"""
-    import plotly.graph_objects as go
-    
-    # Create a grid heatmap
     grid_size = 30
     heatmap_data = np.zeros((grid_size, grid_size))
     
-    # Add "detections" based on object counts
     for _ in range(data['total_objects']):
         x = random.randint(0, grid_size-1)
         y = random.randint(0, grid_size-1)
         heatmap_data[x, y] += random.uniform(0.5, 1.0)
     
-    # Add people with higher intensity
     for _ in range(data['person_count']):
         x = random.randint(0, grid_size-1)
         y = random.randint(0, grid_size-1)
@@ -418,8 +541,7 @@ def create_vision_visualization(data):
     fig = go.Figure(data=go.Heatmap(
         z=heatmap_data,
         colorscale='Viridis',
-        showscale=False,
-        hovertemplate='X: %{x}<br>Y: %{y}<br>Intensity: %{z:.2f}<extra></extra>'
+        showscale=False
     ))
     
     fig.update_layout(
@@ -430,38 +552,17 @@ def create_vision_visualization(data):
         margin=dict(l=0, r=0, t=40, b=0)
     )
     
-    # Add annotations for object types
-    annotations = []
-    y_pos = 0.95
-    for obj, count in data['object_counts'].items():
-        if count > 0:
-            annotations.append(dict(
-                x=0.02,
-                y=y_pos,
-                xref="paper",
-                yref="paper",
-                text=f"• {obj}: {count}",
-                showarrow=False,
-                font=dict(size=12, color="white"),
-                bgcolor="rgba(0,0,0,0.5)"
-            ))
-            y_pos -= 0.05
-    
-    fig.update_layout(annotations=annotations)
-    
     return fig
 
 def show_vision_demo():
     """Show enhanced vision demo with simulated data"""
     st.markdown('<div class="success-box">📹 Vision Demo Mode - Simulated Data</div>', unsafe_allow_html=True)
     
-    # Initialize vision system
     if 'vision_system' not in st.session_state:
         st.session_state.vision_system = SimpleVisionSystem()
     if 'detection_history' not in st.session_state:
         st.session_state.detection_history = []
     
-    # Controls
     col1, col2, col3 = st.columns(3)
     with col1:
         if st.button("🎮 Start Simulation"):
@@ -472,55 +573,41 @@ def show_vision_demo():
     with col3:
         update_rate = st.slider("Update Rate (Hz)", 1, 10, 5)
     
-    # Main display area
     feed_placeholder = st.empty()
     stats_cols = st.columns(4)
     chart_placeholder = st.empty()
     
-    # Run simulation
     if st.session_state.get('simulation_running', False):
-        # Create a placeholder for the loop
-        simulation_placeholder = st.empty()
+        # Get simulated data
+        data = st.session_state.vision_system.process_frame()
+        st.session_state.detection_history.append(data)
         
-        while st.session_state.simulation_running:
-            # Get simulated data
-            data = st.session_state.vision_system.process_frame()
-            st.session_state.detection_history.append(data)
-            
-            # Keep last 100 records
-            if len(st.session_state.detection_history) > 100:
-                st.session_state.detection_history = st.session_state.detection_history[-100:]
-            
-            # Update display
-            with feed_placeholder.container():
-                # Create a visual representation
-                fig = create_vision_visualization(data)
-                st.plotly_chart(fig, use_container_width=True)
-            
-            # Update metrics
-            with stats_cols[0]:
-                st.metric("People", data['person_count'])
-            with stats_cols[1]:
-                st.metric("Total Objects", data['total_objects'])
-            with stats_cols[2]:
-                st.metric("Confidence", f"{data['confidence']*100:.1f}%")
-            with stats_cols[3]:
-                st.metric("FPS", update_rate)
-            
-            # Update history chart
-            if len(st.session_state.detection_history) > 1:
-                hist_df = pd.DataFrame(st.session_state.detection_history)
-                fig2 = px.line(hist_df, y=['person_count', 'total_objects'], 
-                              title="Detection History")
-                chart_placeholder.plotly_chart(fig2, use_container_width=True)
-            
-            # Check if we should stop
-            if not st.session_state.simulation_running:
-                break
-            
-            time.sleep(1/update_rate)
+        if len(st.session_state.detection_history) > 100:
+            st.session_state.detection_history = st.session_state.detection_history[-100:]
+        
+        # Update display
+        with feed_placeholder.container():
+            fig = create_vision_visualization(data)
+            st.plotly_chart(fig, use_container_width=True)
+        
+        with stats_cols[0]:
+            st.metric("People", data['person_count'])
+        with stats_cols[1]:
+            st.metric("Total Objects", data['total_objects'])
+        with stats_cols[2]:
+            st.metric("Confidence", f"{data['confidence']*100:.1f}%")
+        with stats_cols[3]:
+            st.metric("FPS", update_rate)
+        
+        if len(st.session_state.detection_history) > 1:
+            hist_df = pd.DataFrame(st.session_state.detection_history)
+            fig2 = px.line(hist_df, y=['person_count', 'total_objects'], 
+                          title="Detection History")
+            chart_placeholder.plotly_chart(fig2, use_container_width=True)
+        
+        time.sleep(1/update_rate)
+        st.rerun()
     
-    # Export option
     if st.button("📥 Export Detection Data"):
         if st.session_state.detection_history:
             df = pd.DataFrame(st.session_state.detection_history)
@@ -536,7 +623,6 @@ def show_vision_system():
     """Main vision system interface"""
     st.markdown('<div class="section-header">👁️ AI Vision System</div>', unsafe_allow_html=True)
     
-    # Check if we're in demo mode
     if st.session_state.get('vision_demo_mode', False):
         show_vision_demo()
         if st.button("Exit Demo Mode"):
@@ -545,23 +631,20 @@ def show_vision_system():
             st.rerun()
         return
     
-    # Show current status
     col1, col2 = st.columns(2)
     
     with col1:
         st.markdown("### System Status")
         if CV_AVAILABLE:
             st.success(f"✅ Computer Vision: Available (Backend: {CV_BACKEND})")
-            
             if YOLO_AVAILABLE:
                 st.success("✅ YOLO: Available")
             else:
-                st.warning("⚠️ YOLO: Not installed (for object detection)")
-            
+                st.warning("⚠️ YOLO: Not installed")
             if SUPERVISION_AVAILABLE:
                 st.success("✅ Supervision: Available")
             else:
-                st.warning("⚠️ Supervision: Not installed (for tracking)")
+                st.warning("⚠️ Supervision: Not installed")
         else:
             st.error(f"❌ Computer Vision: Not available")
             if CV_ERROR:
@@ -572,47 +655,14 @@ def show_vision_system():
         if st.button("🎮 Try Demo Mode (No Camera Needed)"):
             st.session_state.vision_demo_mode = True
             st.rerun()
-        
         if st.button("🔧 Show Installation Guide"):
             st.session_state.show_install_guide = not st.session_state.show_install_guide
     
-    # Show installation guide if requested
     if st.session_state.get('show_install_guide', False):
         show_installation_guide()
     
-    # System dependencies check
     with st.expander("🔍 System Dependencies Check"):
         check_system_dependencies()
-    
-    # If OpenCV is available but missing system libs, show fix
-    if CV_ERROR and 'libGL' in str(CV_ERROR):
-        st.markdown("""
-        <div class="warning-box">
-            <h4>📦 Missing System Libraries</h4>
-            <p>Create a <code>packages.txt</code> file in your repository root with:</p>
-            <pre><code>libgl1-mesa-glx
-libglib2.0-0
-libsm6
-libxext6
-libxrender-dev
-libgomp1</code></pre>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        # Download button for packages.txt
-        packages_content = """libgl1-mesa-glx
-libglib2.0-0
-libsm6
-libxext6
-libxrender-dev
-libgomp1"""
-        
-        st.download_button(
-            "📥 Download packages.txt",
-            packages_content,
-            file_name="packages.txt",
-            mime="text/plain"
-        )
 
 # ============================================
 # AI CHATBOT
@@ -656,122 +706,24 @@ def show_ai_chatbot():
     if 'chat_history' not in st.session_state:
         st.session_state.chat_history = []
     
-    # Display chat history
-    chat_container = st.container()
-    with chat_container:
-        for message in st.session_state.chat_history[-10:]:
-            with st.chat_message(message["role"]):
-                st.markdown(message["content"])
+    for message in st.session_state.chat_history[-10:]:
+        with st.chat_message(message["role"]):
+            st.markdown(message["content"])
     
-    # Chat input
     if prompt := st.chat_input("Ask me about your warehouse..."):
         st.session_state.chat_history.append({"role": "user", "content": prompt})
         response = st.session_state.chatbot.get_response(prompt)
         st.session_state.chat_history.append({"role": "assistant", "content": response})
         st.rerun()
     
-    # Clear button
     if st.button("Clear Chat"):
         st.session_state.chat_history = []
         st.rerun()
 
-# ============================================
-# PAGE FUNCTIONS
-# ============================================
-
-def show_executive_dashboard():
-    st.markdown('<div class="section-header">📊 Executive Dashboard</div>', unsafe_allow_html=True)
-    
-    col1, col2, col3, col4 = st.columns(4)
-    
-    with col1:
-        st.metric("Total Products", len(st.session_state.products_df))
-    with col2:
-        total_inventory = st.session_state.inventory_df['Quantity_On_Hand'].sum()
-        st.metric("Items in Stock", f"{int(total_inventory):,}")
-    with col3:
-        total_value = total_inventory * st.session_state.products_df['Unit_Cost_BND'].mean()
-        st.metric("Inventory Value", f"B${total_value:,.0f}")
-    with col4:
-        alerts = len(st.session_state.alerts_df) if st.session_state.alerts_df is not None else 0
-        st.metric("Active Alerts", alerts)
-    
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        st.subheader("Stock by Category")
-        cat_stock = st.session_state.inventory_df.merge(
-            st.session_state.products_df[['Product_ID', 'Category']], on='Product_ID'
-        ).groupby('Category')['Quantity_On_Hand'].sum().reset_index()
-        fig = px.pie(cat_stock, values='Quantity_On_Hand', names='Category')
-        st.plotly_chart(fig, use_container_width=True)
-    
-    with col2:
-        st.subheader("Stock by Location")
-        loc_stock = st.session_state.inventory_df.groupby('Location_Name')['Quantity_On_Hand'].sum().reset_index()
-        fig = px.bar(loc_stock, x='Location_Name', y='Quantity_On_Hand')
-        st.plotly_chart(fig, use_container_width=True)
-
-def show_product_crud():
-    st.markdown('<div class="section-header">📦 Product Management</div>', unsafe_allow_html=True)
-    
-    search = st.text_input("🔍 Search products", "")
-    
-    df = st.session_state.products_df
-    if search:
-        df = df[df['Product_Name'].str.contains(search, case=False) | 
-                df['Product_ID'].str.contains(search, case=False)]
-    
-    st.dataframe(df[['Product_ID', 'Product_Name', 'Category', 'Unit_Cost_BND', 'Selling_Price_BND', 'Status']], 
-                 use_container_width=True)
-
-def show_inventory():
-    st.markdown('<div class="section-header">📍 Inventory by Location</div>', unsafe_allow_html=True)
-    
-    location = st.selectbox("Select Location", 
-        ['All'] + st.session_state.locations_df['Location_Name'].tolist())
-    
-    if location != 'All':
-        display_df = st.session_state.inventory_df[
-            st.session_state.inventory_df['Location_Name'] == location
-        ]
-    else:
-        display_df = st.session_state.inventory_df
-    
-    st.dataframe(display_df, use_container_width=True)
-
-def show_purchase_orders():
-    st.markdown('<div class="section-header">📋 Purchase Orders</div>', unsafe_allow_html=True)
-    st.dataframe(st.session_state.purchase_orders_df, use_container_width=True)
-
-def show_suppliers():
-    st.markdown('<div class="section-header">🏢 Suppliers</div>', unsafe_allow_html=True)
-    st.dataframe(st.session_state.suppliers_df, use_container_width=True)
-
-def show_transactions():
-    st.markdown('<div class="section-header">📊 Transactions</div>', unsafe_allow_html=True)
-    st.dataframe(st.session_state.transactions_df, use_container_width=True)
-
-def show_alerts():
-    st.markdown('<div class="section-header">⚠️ Stock Alerts</div>', unsafe_allow_html=True)
-    
-    if st.session_state.alerts_df is not None and len(st.session_state.alerts_df) > 0:
-        for _, alert in st.session_state.alerts_df.iterrows():
-            color = "badge-critical" if alert['Status'] == 'CRITICAL' else "badge-warning"
-            st.markdown(f"""
-            <div class="info-card">
-                <span class="{color}">{alert['Status']}</span>
-                <h3>{alert['Product_Name']}</h3>
-                <p>Current Stock: {alert['Current_Stock']} | Reorder Level: {alert['Reorder_Level']}</p>
-            </div>
-            """, unsafe_allow_html=True)
-    else:
-        st.info("✅ No active alerts")
-
 def show_ai_innovations():
     st.markdown('<div class="section-header">🤖 AI Warehouse Innovations</div>', unsafe_allow_html=True)
     
-    tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
+    tabs = st.tabs([
         "👁️ Vision System",
         "📍 Smart Bin Optimization",
         "📈 Demand Forecasting",
@@ -780,10 +732,10 @@ def show_ai_innovations():
         "📋 Integration"
     ])
     
-    with tab1:
+    with tabs[0]:
         show_vision_system()
     
-    with tab2:
+    with tabs[1]:
         st.subheader("📍 Smart Bin Optimization")
         st.info("Optimize bin locations based on product movement")
         
@@ -793,7 +745,7 @@ def show_ai_innovations():
         with col2:
             st.metric("Optimized Efficiency", "89%", "+22%")
     
-    with tab3:
+    with tabs[2]:
         st.subheader("📈 Demand Forecasting")
         
         dates = pd.date_range(start=datetime.now(), periods=30, freq='D')
@@ -805,7 +757,7 @@ def show_ai_innovations():
         fig = px.line(forecast, x='Date', y='Forecast', title="30-Day Demand Forecast")
         st.plotly_chart(fig, use_container_width=True)
     
-    with tab4:
+    with tabs[3]:
         st.subheader("👥 Labor Optimization")
         st.info("Optimize workforce allocation based on demand")
         
@@ -815,17 +767,17 @@ def show_ai_innovations():
         with col2:
             st.metric("Optimal Staff", "24", "-3")
     
-    with tab5:
+    with tabs[4]:
         show_ai_chatbot()
     
-    with tab6:
+    with tabs[5]:
         st.subheader("📋 System Integration")
         st.markdown("""
         **Available Integrations:**
         - ✅ Inventory Management
         - ✅ Purchase Orders
         - ✅ Supplier Directory
-        - ⏳ Computer Vision (Requires setup)
+        - ⏳ Computer Vision (Demo Mode Active)
         - ⏳ Barcode Scanning (Coming soon)
         """)
 
@@ -852,17 +804,13 @@ def main():
         
         st.markdown("---")
         
-        # Status indicators
         if CV_AVAILABLE:
             st.success(f"✅ Vision: {CV_BACKEND}")
         else:
-            st.warning("⚠️ Vision: Limited")
-            if st.button("🎮 Try Demo"):
-                st.session_state.vision_demo_mode = True
+            st.warning("⚠️ Vision: Demo Mode")
         
         st.caption(f"Last updated: {datetime.now().strftime('%Y-%m-%d %H:%M')}")
     
-    # Page routing
     if page == "Executive Dashboard":
         show_executive_dashboard()
     elif page == "Product Management":

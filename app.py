@@ -87,7 +87,7 @@ try:
     secure_session.mount("http://", adapter)
     secure_session.mount("https://", adapter)
     secure_session.headers.update({
-        'User-Agent': 'BruneiInventorySystem/1.0',
+        'User-Agent': 'WarehouseInventorySystem/1.0',
         'Accept': 'image/jpeg,image/png,*/*'
     })
     
@@ -97,28 +97,27 @@ except ImportError as e:
 
 # Page configuration
 st.set_page_config(
-    page_title="Brunei Smart Inventory System",
-    page_icon="🏭",
+    page_title="Warehouse Stock Inventory System",
+    page_icon="📦",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS for Brunei theme
+# Custom CSS
 st.markdown("""
 <style>
     .main-header {
         font-size: 2.5rem;
         font-weight: bold;
-        color: #FFD700;
+        color: #1e3c72;
         text-align: center;
-        background: linear-gradient(90deg, #FFD700 0%, #000000 50%, #FFD700 100%);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
         padding: 1rem;
+        border-bottom: 3px solid #1e3c72;
+        margin-bottom: 2rem;
     }
     
-    /* CRUD Dashboard Specific Styles */
-    .crud-container {
+    /* Dashboard Styles */
+    .dashboard-container {
         background-color: #f8f9fa;
         padding: 2rem;
         border-radius: 15px;
@@ -126,8 +125,8 @@ st.markdown("""
         box-shadow: 0 4px 6px rgba(0,0,0,0.1);
     }
     
-    .crud-header {
-        background: linear-gradient(135deg, #FFD700 0%, #000000 100%);
+    .dashboard-header {
+        background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
         color: white;
         padding: 1.5rem;
         border-radius: 10px;
@@ -140,7 +139,7 @@ st.markdown("""
         padding: 1.5rem;
         border-radius: 10px;
         margin: 1rem 0;
-        border-left: 5px solid #FFD700;
+        border-left: 5px solid #1e3c72;
         box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         transition: transform 0.2s;
     }
@@ -194,20 +193,15 @@ st.markdown("""
     }
     
     .metric-card {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
         padding: 20px;
         border-radius: 10px;
         color: white;
     }
     
-    .brunei-flag {
-        text-align: center;
-        font-size: 3rem;
-    }
-    
     .stButton>button {
-        background-color: #FFD700;
-        color: black;
+        background-color: #1e3c72;
+        color: white;
         font-weight: bold;
         border: none;
         border-radius: 5px;
@@ -216,9 +210,9 @@ st.markdown("""
     }
     
     .stButton>button:hover {
-        background-color: black;
-        color: #FFD700;
-        border: 1px solid #FFD700;
+        background-color: #2a5298;
+        color: white;
+        border: 1px solid #1e3c72;
     }
     
     .delete-btn>button {
@@ -249,7 +243,7 @@ st.markdown("""
     
     /* Camera feed styling */
     .camera-container {
-        border: 2px solid #FFD700;
+        border: 2px solid #1e3c72;
         border-radius: 10px;
         padding: 1rem;
         margin: 1rem 0;
@@ -262,11 +256,28 @@ st.markdown("""
         margin: 0.5rem 0;
         border-left: 4px solid #2e7d32;
     }
+    
+    /* Section headers without icons */
+    .section-header {
+        font-size: 1.8rem;
+        font-weight: 600;
+        color: #1e3c72;
+        margin: 1.5rem 0 1rem 0;
+        padding-bottom: 0.5rem;
+        border-bottom: 2px solid #1e3c72;
+    }
+    
+    .subsection-header {
+        font-size: 1.4rem;
+        font-weight: 500;
+        color: #2a5298;
+        margin: 1rem 0;
+    }
 </style>
 """, unsafe_allow_html=True)
 
 # ============================================
-# SECURE CAMERA MANAGER CLASS - DEFINED BEFORE USE
+# SECURE CAMERA MANAGER CLASS
 # ============================================
 
 class SecureCameraManager:
@@ -655,7 +666,7 @@ if 'session_id' not in st.session_state:
 @st.cache_data(ttl=300)
 def load_initial_data():
     """
-    Load initial data from Excel file structure
+    Load initial data
     """
     
     # Product Master List (50 products)
@@ -718,8 +729,8 @@ def load_initial_data():
         'Preferred_Supplier', 'Status'
     ])
     
-    # Inventory by Location (250 records - 50 products × 5 locations)
-    locations = ['Warehouse A - Beribi', 'Store 1 - Gadong', 'Store 2 - Kiulap', 'Store 3 - Kuala Belait', 'Store 4 - Tutong']
+    # Inventory by Location
+    locations = ['Warehouse A', 'Store 1', 'Store 2', 'Store 3', 'Store 4']
     
     inventory_data = []
     base_quantities = {
@@ -752,10 +763,9 @@ def load_initial_data():
     inventory = pd.DataFrame(inventory_data)
     
     # Stock Transactions
-    transaction_types = ['ADJUSTMENT', 'STOCK IN', 'STOCK OUT']
+    transaction_types = ['Adjustment', 'Stock In', 'Stock Out']
     remarks_options = ['Inventory Count', 'Purchase Order', 'Sale', 'System Correction', 
-                      'Transfer from Warehouse', 'Return from Customer', 'Expired', 
-                      'Damaged', 'Sample/Display']
+                      'Transfer', 'Return', 'Expired', 'Damaged', 'Sample']
     
     transactions_data = []
     for i in range(150):
@@ -763,7 +773,7 @@ def load_initial_data():
         loc_idx = i % 5
         txn_type = transaction_types[i % 3]
         
-        qty = 5 if txn_type == 'ADJUSTMENT' else (10 if txn_type == 'STOCK IN' else -5)
+        qty = 5 if txn_type == 'Adjustment' else (10 if txn_type == 'Stock In' else -5)
         
         transactions_data.append({
             'Transaction_ID': f'TRX2026{i:04d}',
@@ -781,16 +791,16 @@ def load_initial_data():
     
     # Supplier Management
     suppliers_data = [
-        ['SUP001', 'Hua Ho Trading', 'Lim Ah Seng', '673-2223456', 'purchasing@huaho.com.bn', 'KG Kiulap, Bandar Seri Begawan', 'Cash on Delivery'],
-        ['SUP002', 'Soon Lee MegaMart', 'Tan Mei Ling', '673-2337890', 'orders@soonlee.com.bn', 'Gadong Central, BSB', 'Cash on Delivery'],
-        ['SUP003', 'Supasave', 'David Wong', '673-2456789', 'procurement@supasave.com.bn', 'Serusop, BSB', 'Net 45'],
-        ['SUP004', 'Seng Huat', 'Michael Chen', '673-2771234', 'sales@senghuat.com.bn', 'Kuala Belait', 'Cash on Delivery'],
-        ['SUP005', 'SKH Group', 'Steven Khoo', '673-2667890', 'trading@skh.com.bn', 'Tutong Town', 'Net 30'],
-        ['SUP006', 'Wee Hua Enterprise', 'Jason Wee', '673-2884567', 'orders@weehua.com.bn', 'Seria', 'Net 30'],
-        ['SUP007', 'Pohan Motors', 'Ahmad Pohan', '673-2334455', 'parts@pohan.com.bn', 'Beribi Industrial Park', 'Cash on Delivery'],
-        ['SUP008', 'D\'Sunlit Supermarket', 'Hjh Zainab', '673-2656789', 'procurement@dsunlit.com.bn', 'Menglait, BSB', 'Cash on Delivery'],
-        ['SUP009', 'Joyful Mart', 'Liew KF', '673-2781234', 'supply@joyfulmart.com.bn', 'Kiarong', 'Net 45'],
-        ['SUP010', 'Al-Falah Corporation', 'Hj Osman', '673-2235678', 'trading@alfalah.com.bn', 'Lambak Kanan', 'Cash on Delivery'],
+        ['SUP001', 'Hua Ho Trading', 'Lim Ah Seng', '673-2223456', 'purchasing@huaho.com', 'KG Kiulap', 'Cash on Delivery'],
+        ['SUP002', 'Soon Lee MegaMart', 'Tan Mei Ling', '673-2337890', 'orders@soonlee.com', 'Gadong Central', 'Cash on Delivery'],
+        ['SUP003', 'Supasave', 'David Wong', '673-2456789', 'procurement@supasave.com', 'Serusop', 'Net 45'],
+        ['SUP004', 'Seng Huat', 'Michael Chen', '673-2771234', 'sales@senghuat.com', 'Kuala Belait', 'Cash on Delivery'],
+        ['SUP005', 'SKH Group', 'Steven Khoo', '673-2667890', 'trading@skh.com', 'Tutong Town', 'Net 30'],
+        ['SUP006', 'Wee Hua Enterprise', 'Jason Wee', '673-2884567', 'orders@weehua.com', 'Seria', 'Net 30'],
+        ['SUP007', 'Pohan Motors', 'Ahmad Pohan', '673-2334455', 'parts@pohan.com', 'Beribi', 'Cash on Delivery'],
+        ['SUP008', 'DSunlit Supermarket', 'Hjh Zainab', '673-2656789', 'procurement@dsunlit.com', 'Menglait', 'Cash on Delivery'],
+        ['SUP009', 'Joyful Mart', 'Liew KF', '673-2781234', 'supply@joyfulmart.com', 'Kiarong', 'Net 45'],
+        ['SUP010', 'Al-Falah Corporation', 'Hj Osman', '673-2235678', 'trading@alfalah.com', 'Lambak Kanan', 'Cash on Delivery'],
     ]
     
     suppliers = pd.DataFrame(suppliers_data, columns=[
@@ -838,11 +848,11 @@ def load_initial_data():
     
     def get_alert_status(row):
         if row['Quantity_On_Hand'] <= row['Reorder_Level'] * 0.5:
-            return '🔴 CRITICAL'
+            return 'Critical'
         elif row['Quantity_On_Hand'] <= row['Reorder_Level']:
-            return '🟡 WARNING'
+            return 'Warning'
         else:
-            return '🟢 NORMAL'
+            return 'Normal'
     
     alerts['Alert_Status'] = alerts.apply(get_alert_status, axis=1)
     
@@ -913,7 +923,7 @@ def decrypt_sensitive_data(encrypted_data):
 def show_secure_camera_system():
     """Main UI for secure camera system"""
     
-    st.markdown('<div class="section-header">📱 Secure Mobile Camera Vision System</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-header">Mobile Camera Vision System</div>', unsafe_allow_html=True)
     
     # Check session timeout
     if check_session_timeout():
@@ -922,7 +932,7 @@ def show_secure_camera_system():
     # Check if camera libraries are available
     if not CAMERA_LIBS_AVAILABLE:
         st.warning("""
-        ⚠️ Camera libraries not installed. To enable secure camera features, install:
+        Camera libraries not installed. To enable secure camera features, install:
         ```bash
         pip install opencv-python-headless requests cryptography Pillow
         ```
@@ -935,21 +945,21 @@ def show_secure_camera_system():
         return
     
     # Security status indicator
-    with st.expander("🔒 Security Status", expanded=False):
+    with st.expander("Security Status", expanded=False):
         col1, col2, col3 = st.columns(3)
         with col1:
             st.metric("Session ID", st.session_state.session_id[:8] + "...")
         with col2:
-            enc_status = "✅ Active" if CRYPTO_AVAILABLE else "❌ Disabled"
+            enc_status = "Active" if CRYPTO_AVAILABLE else "Disabled"
             st.metric("Encryption", enc_status)
         with col3:
-            st.metric("Network", "🔒 Private" if st.session_state.camera_connected else "🔓 Disconnected")
+            st.metric("Network", "Private" if st.session_state.camera_connected else "Disconnected")
     
     # Camera selection and connection
     col1, col2 = st.columns([1, 1])
     
     with col1:
-        st.markdown("### 📱 Device Selection")
+        st.markdown("### Device Selection")
         
         camera_type = st.radio(
             "Select Device Type:",
@@ -962,7 +972,7 @@ def show_secure_camera_system():
         
         # Authentication option
         st.session_state.camera_auth_required = st.checkbox(
-            "🔐 Authentication Required",
+            "Authentication Required",
             value=st.session_state.camera_auth_required,
             help="Check if your camera app requires login"
         )
@@ -984,7 +994,7 @@ def show_secure_camera_system():
                 )
     
     with col2:
-        st.markdown("### 🔌 Connection Settings")
+        st.markdown("### Connection Settings")
         
         camera_url = st.text_input(
             "Camera URL:",
@@ -995,14 +1005,14 @@ def show_secure_camera_system():
         
         # Validate URL format
         if camera_url and not camera_url.startswith(('http://', 'https://')):
-            st.error("❌ URL must start with http:// or https://")
+            st.error("URL must start with http:// or https://")
         else:
             st.session_state.camera_url = sanitize_input(camera_url)
         
         col_b1, col_b2 = st.columns(2)
         
         with col_b1:
-            if st.button("🔒 Secure Connect", use_container_width=True, type="primary"):
+            if st.button("Secure Connect", use_container_width=True, type="primary"):
                 if st.session_state.camera_url:
                     with st.spinner("Establishing secure connection..."):
                         success, message = st.session_state.secure_camera.secure_connect(
@@ -1015,21 +1025,21 @@ def show_secure_camera_system():
                         
                         if success:
                             st.session_state.camera_connected = True
-                            st.success(f"✅ {message}")
+                            st.success(f"{message}")
                             st.balloons()
                             
                             # Log successful connection
                             logger.info(f"Secure connection established: {st.session_state.session_id}")
                         else:
-                            st.error(f"❌ {message}")
+                            st.error(f"{message}")
                 else:
                     st.warning("Please enter camera URL")
         
         with col_b2:
-            if st.button("🔐 Test Security", use_container_width=True):
+            if st.button("Test Security", use_container_width=True):
                 with st.spinner("Running security checks..."):
                     time.sleep(1)
-                    st.success("✅ Security checks passed")
+                    st.success("Security checks passed")
                     st.info("""
                     - Network: Private range validated
                     - Encryption: Active
@@ -1040,29 +1050,29 @@ def show_secure_camera_system():
     # Detection settings (only shown when connected)
     if st.session_state.camera_connected:
         st.markdown("---")
-        st.markdown("### 🔍 Detection Settings")
+        st.markdown("### Detection Settings")
         
         col_c1, col_c2, col_c3 = st.columns(3)
         
         with col_c1:
             st.session_state.detection_enabled = st.toggle(
-                "👥 Enable People Detection",
+                "Enable People Detection",
                 value=st.session_state.detection_enabled,
                 help="Detect and count people in camera feed"
             )
         
         with col_c2:
-            if st.button("⏹️ Disconnect", use_container_width=True):
+            if st.button("Disconnect", use_container_width=True):
                 st.session_state.secure_camera.disconnect()
                 st.session_state.camera_connected = False
                 st.session_state.detection_enabled = False
                 st.rerun()
         
         with col_c3:
-            st.metric("Connection Status", "✅ Secure" if st.session_state.camera_connected else "❌ Disconnected")
+            st.metric("Connection Status", "Secure" if st.session_state.camera_connected else "Disconnected")
         
         # Live feed
-        st.markdown("### 📹 Secure Live Feed")
+        st.markdown("### Live Feed")
         
         # Create placeholders
         feed_placeholder = st.empty()
@@ -1108,7 +1118,7 @@ def show_secure_camera_system():
                 with col_s1:
                     st.metric(
                         "People Detected" if st.session_state.detection_enabled else "Camera Status",
-                        st.session_state.person_count if st.session_state.detection_enabled else "🟢 Live"
+                        st.session_state.person_count if st.session_state.detection_enabled else "Live"
                     )
                 
                 with col_s2:
@@ -1126,7 +1136,7 @@ def show_secure_camera_system():
                 security_text = """
                 <div style="background-color: #e8f5e9; padding: 10px; border-radius: 5px; margin: 10px 0;">
                     <p style="color: #2e7d32; margin: 0;">
-                        🔒 <strong>Security Active:</strong> 
+                        <strong>Security Active:</strong> 
                 """
                 
                 if CRYPTO_AVAILABLE:
@@ -1139,10 +1149,10 @@ def show_secure_camera_system():
             
             # Show detection history
             if st.session_state.detection_history and st.session_state.detection_enabled:
-                st.markdown("### 📊 People Detection History")
+                st.markdown("### People Detection History")
                 hist_df = pd.DataFrame(st.session_state.detection_history)
                 fig = px.line(hist_df, x='timestamp', y='people', 
-                             title="People Count Over Time (Secure Session)")
+                             title="People Count Over Time")
                 st.plotly_chart(fig, use_container_width=True)
             
             # Auto-refresh
@@ -1150,10 +1160,10 @@ def show_secure_camera_system():
             st.rerun()
             
         else:
-            feed_placeholder.warning("⚠️ Waiting for secure camera feed...")
+            feed_placeholder.warning("Waiting for camera feed...")
             
             # Reconnect option
-            if st.button("🔄 Reconnect", use_container_width=True):
+            if st.button("Reconnect", use_container_width=True):
                 st.rerun()
 
 # ============================================
@@ -1218,8 +1228,7 @@ def add_product(product_data):
     )
     
     # Add initial inventory for all locations
-    locations = ['Warehouse A - Beribi', 'Store 1 - Gadong', 'Store 2 - Kiulap', 
-                 'Store 3 - Kuala Belait', 'Store 4 - Tutong']
+    locations = ['Warehouse A', 'Store 1', 'Store 2', 'Store 3', 'Store 4']
     
     new_inventory = []
     for loc in locations:
@@ -1311,9 +1320,9 @@ def show_product_crud_dashboard():
     """Main CRUD dashboard for product management"""
     
     st.markdown("""
-    <div class="crud-header">
-        <h1>📝 Product Master List Management</h1>
-        <p style="font-size: 1.2rem;">Create, Read, Update, and Delete Products in Real-Time</p>
+    <div class="dashboard-header">
+        <h1>Product Master List Management</h1>
+        <p style="font-size: 1.2rem;">Create, Read, Update, and Delete Products</p>
     </div>
     """, unsafe_allow_html=True)
     
@@ -1343,18 +1352,18 @@ def show_product_crud_dashboard():
     col1, col2, col3, col4 = st.columns([1, 1, 1, 3])
     
     with col1:
-        if st.button("➕ ADD NEW PRODUCT", use_container_width=True):
+        if st.button("ADD NEW PRODUCT", use_container_width=True):
             st.session_state.crud_mode = "add"
             st.session_state.editing_product = None
             st.rerun()
     
     with col2:
-        if st.button("📋 VIEW ALL", use_container_width=True):
+        if st.button("VIEW ALL", use_container_width=True):
             reset_crud_mode()
             st.rerun()
     
     with col3:
-        if st.button("🔄 REFRESH", use_container_width=True):
+        if st.button("REFRESH", use_container_width=True):
             st.rerun()
     
     st.markdown("---")
@@ -1371,8 +1380,8 @@ def show_add_product_form():
     """Display form for adding new products"""
     
     st.markdown("""
-    <div class="crud-container">
-        <h2 style="color: #FFD700; margin-bottom: 1.5rem;">➕ Add New Product</h2>
+    <div class="dashboard-container">
+        <h2 style="color: #1e3c72; margin-bottom: 1.5rem;">Add New Product</h2>
     """, unsafe_allow_html=True)
     
     with st.form("add_product_form", clear_on_submit=True):
@@ -1452,15 +1461,15 @@ def show_add_product_form():
         # Submit buttons
         col1, col2, col3 = st.columns([1, 1, 2])
         with col1:
-            submitted = st.form_submit_button("💾 SAVE PRODUCT", use_container_width=True)
+            submitted = st.form_submit_button("SAVE PRODUCT", use_container_width=True)
         with col2:
-            cancelled = st.form_submit_button("❌ CANCEL", use_container_width=True)
+            cancelled = st.form_submit_button("CANCEL", use_container_width=True)
         
         if submitted:
             if not product_name:
-                st.error("❌ Product Name is required!")
+                st.error("Product Name is required!")
             elif selling_price <= unit_cost:
-                st.error("❌ Selling Price must be greater than Unit Cost!")
+                st.error("Selling Price must be greater than Unit Cost!")
             else:
                 # Prepare product data
                 product_data = {
@@ -1479,13 +1488,13 @@ def show_add_product_form():
                 success, result = add_product(product_data)
                 
                 if success:
-                    st.success(f"✅ Product '{product_name}' added successfully! Product ID: {result}")
+                    st.success(f"Product '{product_name}' added successfully! Product ID: {result}")
                     st.balloons()
                     time.sleep(2)
                     reset_crud_mode()
                     st.rerun()
                 else:
-                    st.error(f"❌ Error adding product: {', '.join(result)}")
+                    st.error(f"Error adding product: {', '.join(result)}")
         
         if cancelled:
             reset_crud_mode()
@@ -1502,8 +1511,8 @@ def show_edit_product_form(product_id):
     ].iloc[0]
     
     st.markdown(f"""
-    <div class="crud-container">
-        <h2 style="color: #FFD700; margin-bottom: 1.5rem;">✏️ Edit Product: {product['Product_Name']}</h2>
+    <div class="dashboard-container">
+        <h2 style="color: #1e3c72; margin-bottom: 1.5rem;">Edit Product: {product['Product_Name']}</h2>
         <p style="margin-bottom: 1rem;"><strong>Product ID:</strong> {product_id}</p>
     """, unsafe_allow_html=True)
     
@@ -1572,15 +1581,15 @@ def show_edit_product_form(product_id):
         # Submit buttons
         col1, col2, col3 = st.columns([1, 1, 2])
         with col1:
-            submitted = st.form_submit_button("💾 UPDATE PRODUCT", use_container_width=True)
+            submitted = st.form_submit_button("UPDATE PRODUCT", use_container_width=True)
         with col2:
-            cancelled = st.form_submit_button("❌ CANCEL", use_container_width=True)
+            cancelled = st.form_submit_button("CANCEL", use_container_width=True)
         
         if submitted:
             if not product_name:
-                st.error("❌ Product Name is required!")
+                st.error("Product Name is required!")
             elif selling_price <= unit_cost:
-                st.error("❌ Selling Price must be greater than Unit Cost!")
+                st.error("Selling Price must be greater than Unit Cost!")
             else:
                 # Prepare updated data
                 updated_data = {
@@ -1597,12 +1606,12 @@ def show_edit_product_form(product_id):
                 success, errors = update_product(product_id, updated_data)
                 
                 if success:
-                    st.success(f"✅ Product '{product_name}' updated successfully!")
+                    st.success(f"Product '{product_name}' updated successfully!")
                     time.sleep(2)
                     reset_crud_mode()
                     st.rerun()
                 else:
-                    st.error(f"❌ Error updating product: {', '.join(errors)}")
+                    st.error(f"Error updating product: {', '.join(errors)}")
         
         if cancelled:
             reset_crud_mode()
@@ -1617,7 +1626,7 @@ def show_product_list():
     col1, col2, col3 = st.columns([2, 1, 1])
     
     with col1:
-        search = st.text_input("🔍 Search by Product Name or ID", placeholder="Type to search...")
+        search = st.text_input("Search by Product Name or ID", placeholder="Type to search...")
     
     with col2:
         category_filter = st.multiselect(
@@ -1650,7 +1659,7 @@ def show_product_list():
         filtered_df = filtered_df[filtered_df['Status'].isin(status_filter)]
     
     # Show results count
-    st.info(f"📊 Showing {len(filtered_df)} of {len(st.session_state.products_df)} products")
+    st.info(f"Showing {len(filtered_df)} of {len(st.session_state.products_df)} products")
     
     # Display products in cards
     for idx, row in filtered_df.iterrows():
@@ -1676,7 +1685,7 @@ def show_product_list():
             
             with col5:
                 # Edit button
-                if st.button("✏️ Edit", key=f"edit_{row['Product_ID']}", use_container_width=True):
+                if st.button("Edit", key=f"edit_{row['Product_ID']}", use_container_width=True):
                     st.session_state.crud_mode = "edit"
                     st.session_state.editing_product = row['Product_ID']
                     st.rerun()
@@ -1687,20 +1696,20 @@ def show_product_list():
                     st.session_state.delete_confirmation[delete_key] = False
                 
                 if not st.session_state.delete_confirmation[delete_key]:
-                    if st.button("🗑️ Delete", key=delete_key, use_container_width=True):
+                    if st.button("Delete", key=delete_key, use_container_width=True):
                         st.session_state.delete_confirmation[delete_key] = True
                         st.rerun()
                 else:
                     col_d1, col_d2 = st.columns(2)
                     with col_d1:
-                        if st.button("✅ Yes", key=f"confirm_{row['Product_ID']}", use_container_width=True):
+                        if st.button("Yes", key=f"confirm_{row['Product_ID']}", use_container_width=True):
                             deleted_name = delete_product(row['Product_ID'])
                             st.session_state.delete_confirmation[delete_key] = False
-                            st.success(f"✅ Product '{deleted_name}' deleted successfully!")
+                            st.success(f"Product '{deleted_name}' deleted successfully!")
                             time.sleep(1)
                             st.rerun()
                     with col_d2:
-                        if st.button("❌ No", key=f"cancel_{row['Product_ID']}", use_container_width=True):
+                        if st.button("No", key=f"cancel_{row['Product_ID']}", use_container_width=True):
                             st.session_state.delete_confirmation[delete_key] = False
                             st.rerun()
             
@@ -1711,28 +1720,28 @@ def show_product_list():
 # ============================================
 
 def show_executive_dashboard():
-    st.title("Executive Dashboard")
+    st.markdown('<div class="section-header">Executive Dashboard</div>', unsafe_allow_html=True)
     
     # KPI Cards
     col1, col2, col3, col4 = st.columns(4)
     
     with col1:
-        st.metric("📦 Total Products", len(st.session_state.products_df), "10 Categories")
+        st.metric("Total Products", len(st.session_state.products_df))
     with col2:
         inventory_val = st.session_state.inventory_df.merge(
             st.session_state.products_df[['Product_ID', 'Unit_Cost_BND']], on='Product_ID'
         )
         inventory_val['Value'] = inventory_val['Quantity_On_Hand'] * inventory_val['Unit_Cost_BND']
         total_inventory_value = inventory_val['Value'].sum()
-        st.metric("💰 Inventory Value", f"BND ${total_inventory_value:,.0f}")
+        st.metric("Inventory Value", f"BND ${total_inventory_value:,.0f}")
     with col3:
-        st.metric("📍 Locations", st.session_state.inventory_df['Location'].nunique(), "1 Warehouse + 4 Stores")
+        st.metric("Locations", st.session_state.inventory_df['Location'].nunique())
     with col4:
         pending_statuses = ['Confirmed', 'Sent', 'Draft', 'Shipped']
         pending_orders = len(st.session_state.purchase_orders_df[
             st.session_state.purchase_orders_df['Order_Status'].isin(pending_statuses)
         ])
-        st.metric("📋 Pending Orders", pending_orders, "Require Attention")
+        st.metric("Pending Orders", pending_orders)
     
     st.markdown("---")
     
@@ -1740,26 +1749,26 @@ def show_executive_dashboard():
     col1, col2 = st.columns(2)
     
     with col1:
-        st.subheader("📊 Products by Category")
+        st.subheader("Products by Category")
         category_data = st.session_state.products_df['Category'].value_counts()
         fig = px.pie(values=category_data.values, names=category_data.index)
         st.plotly_chart(fig, use_container_width=True)
     
     with col2:
-        st.subheader("📍 Stock Distribution by Location")
+        st.subheader("Stock Distribution by Location")
         location_data = st.session_state.inventory_df.groupby('Location')['Quantity_On_Hand'].sum().reset_index()
         fig = px.bar(location_data, x='Location', y='Quantity_On_Hand',
-                    color='Quantity_On_Hand', color_continuous_scale='Viridis')
+                    color='Quantity_On_Hand', color_continuous_scale='Blues')
         fig.update_layout(xaxis_tickangle=-45)
         st.plotly_chart(fig, use_container_width=True)
 
 def show_product_master():
-    st.title("Product Master List")
+    st.markdown('<div class="section-header">Product Master List</div>', unsafe_allow_html=True)
     
     # Filters
     col1, col2 = st.columns(2)
     with col1:
-        search = st.text_input("🔍 Search products...")
+        search = st.text_input("Search products...")
     with col2:
         category_filter = st.multiselect("Filter by Category:", st.session_state.products_df['Category'].unique())
     
@@ -1772,7 +1781,7 @@ def show_product_master():
     st.dataframe(filtered_df, use_container_width=True)
 
 def show_inventory_by_location():
-    st.title("Multi-Location Inventory")
+    st.markdown('<div class="section-header">Multi-Location Inventory</div>', unsafe_allow_html=True)
     
     location_filter = st.selectbox("Select Location:", ['All'] + list(st.session_state.inventory_df['Location'].unique()))
     
@@ -1786,7 +1795,7 @@ def show_inventory_by_location():
                 use_container_width=True)
 
 def show_stock_transactions():
-    st.title("Stock Transaction History")
+    st.markdown('<div class="section-header">Stock Transaction History</div>', unsafe_allow_html=True)
     
     # Filters
     col1, col2, col3 = st.columns(3)
@@ -1808,7 +1817,7 @@ def show_stock_transactions():
     st.dataframe(filtered_txn.sort_values('Date', ascending=False), use_container_width=True)
 
 def show_purchase_orders():
-    st.title("Purchase Order Management")
+    st.markdown('<div class="section-header">Purchase Order Management</div>', unsafe_allow_html=True)
     
     # Filters
     col1, col2 = st.columns(2)
@@ -1826,11 +1835,11 @@ def show_purchase_orders():
     st.dataframe(filtered_po.sort_values('Order_Date', ascending=False), use_container_width=True)
 
 def show_supplier_directory():
-    st.title("Supplier Directory")
+    st.markdown('<div class="section-header">Supplier Directory</div>', unsafe_allow_html=True)
     st.dataframe(st.session_state.suppliers_df, use_container_width=True)
 
 def show_stock_alerts():
-    st.title("Automated Stock Alert System")
+    st.markdown('<div class="section-header">Automated Stock Alert System</div>', unsafe_allow_html=True)
     
     # Calculate alerts
     stock_levels = st.session_state.inventory_df.groupby('Product_ID')['Quantity_On_Hand'].sum().reset_index()
@@ -1840,41 +1849,41 @@ def show_stock_alerts():
     
     def get_status(row):
         if row['Quantity_On_Hand'] <= row['Reorder_Level'] * 0.5:
-            return '🔴 CRITICAL'
+            return 'Critical'
         elif row['Quantity_On_Hand'] <= row['Reorder_Level']:
-            return '🟡 WARNING'
+            return 'Warning'
         else:
-            return '🟢 NORMAL'
+            return 'Normal'
     
     stock_levels['Alert_Status'] = stock_levels.apply(get_status, axis=1)
     
     # Summary
     col1, col2, col3 = st.columns(3)
-    col1.metric("🔴 Critical", len(stock_levels[stock_levels['Alert_Status'] == '🔴 CRITICAL']))
-    col2.metric("🟡 Warning", len(stock_levels[stock_levels['Alert_Status'] == '🟡 WARNING']))
-    col3.metric("🟢 Normal", len(stock_levels[stock_levels['Alert_Status'] == '🟢 NORMAL']))
+    col1.metric("Critical", len(stock_levels[stock_levels['Alert_Status'] == 'Critical']))
+    col2.metric("Warning", len(stock_levels[stock_levels['Alert_Status'] == 'Warning']))
+    col3.metric("Normal", len(stock_levels[stock_levels['Alert_Status'] == 'Normal']))
     
     st.dataframe(stock_levels, use_container_width=True)
 
 def show_visionify_ai():
     """Enhanced Visionify AI page with secure camera integration"""
     
-    st.title("🤖 Visionify AI - Secure Computer Vision Monitoring")
+    st.markdown('<div class="section-header">Computer Vision Monitoring</div>', unsafe_allow_html=True)
     
     # Create tabs for different features
     tab1, tab2, tab3 = st.tabs([
-        "📱 Mobile Camera Integration",
-        "🏭 Warehouse CCTV Integration",
-        "📊 Analytics & Reports"
+        "Mobile Camera Integration",
+        "Warehouse CCTV Integration",
+        "Analytics & Reports"
     ])
     
     with tab1:
         show_secure_camera_system()
     
     with tab2:
-        st.subheader("🏭 CCTV System Integration")
+        st.subheader("CCTV System Integration")
         st.info("""
-        Visionify AI can integrate with existing CCTV infrastructure:
+        Computer vision system can integrate with existing CCTV infrastructure:
         
         **Features:**
         - Real-time inventory counting
@@ -1886,7 +1895,7 @@ def show_visionify_ai():
         **Security:**
         - End-to-end encryption
         - On-premise processing option
-        - GDPR/ PDPA compliant
+        - GDPR/PDPA compliant
         - Audit logging
         """)
         
@@ -1897,7 +1906,7 @@ def show_visionify_ai():
             st.metric("Detections Today", "1,247", "+12.3%")
     
     with tab3:
-        st.subheader("📊 Security Analytics")
+        st.subheader("Security Analytics")
         
         # Sample analytics
         analytics_data = pd.DataFrame({
@@ -1912,7 +1921,7 @@ def show_visionify_ai():
         
         st.markdown("""
         <div style="background-color: #e3f2fd; padding: 20px; border-radius: 10px;">
-            <h4 style="color: #1565c0;">🔒 Security Compliance</h4>
+            <h4 style="color: #1565c0;">Security Compliance</h4>
             <ul style="color: #0d47a1;">
                 <li>✅ End-to-end encryption enabled</li>
                 <li>✅ GDPR compliant data handling</li>
@@ -1925,14 +1934,14 @@ def show_visionify_ai():
 def show_warehouse_assistant():
     """Enhanced warehouse assistant with security context"""
     
-    st.title("🤖 Secure Warehouse AI Assistant")
+    st.markdown('<div class="section-header">Warehouse Assistant</div>', unsafe_allow_html=True)
     
     # Security context
     enc_status = "Active" if CRYPTO_AVAILABLE else "Disabled"
     st.markdown(f"""
     <div style="background-color: #e8f5e9; padding: 10px; border-radius: 5px; margin-bottom: 20px;">
         <p style="color: #2e7d32; margin: 0;">
-            🔒 <strong>Secure Session:</strong> {st.session_state.session_id[:8]} | 
+            <strong>Secure Session:</strong> {st.session_state.session_id[:8]} | 
             Started: {st.session_state.session_start.strftime('%H:%M:%S')} | 
             Encryption: {enc_status}
         </p>
@@ -1947,13 +1956,13 @@ def show_warehouse_assistant():
         with st.chat_message(message["role"]):
             st.markdown(message["content"])
     
-    # Quick actions with security context
+    # Quick actions
     col1, col2, col3, col4 = st.columns(4)
     
     with col1:
-        if st.button("🔒 Security Status"):
+        if st.button("Security Status"):
             response = f"""
-            🔐 **Security Status:**
+            **Security Status:**
             - Session: {st.session_state.session_id[:8]}
             - Encryption: {enc_status}
             - Camera: {'Connected' if st.session_state.camera_connected else 'Disconnected'}
@@ -1963,12 +1972,12 @@ def show_warehouse_assistant():
             st.rerun()
     
     with col2:
-        if st.button("📱 Camera Help"):
+        if st.button("Camera Help"):
             response = """
-            📱 **Secure Camera Setup:**
+            **Secure Camera Setup:**
             1. Install IP Camera Lite (iPhone) or IP Webcam (Android)
             2. Ensure same private WiFi network
-            3. Enter URL in Visionify AI tab
+            3. Enter URL in Vision system tab
             4. Click "Secure Connect"
             5. Enable people detection
             """
@@ -1976,19 +1985,19 @@ def show_warehouse_assistant():
             st.rerun()
     
     with col3:
-        if st.button("📊 Inventory Query"):
+        if st.button("Inventory Query"):
             inventory_val = st.session_state.inventory_df.merge(
                 st.session_state.products_df[['Product_ID', 'Unit_Cost_BND']], on='Product_ID'
             )
             inventory_val['Value'] = inventory_val['Quantity_On_Hand'] * inventory_val['Unit_Cost_BND']
             total_value = inventory_val['Value'].sum()
-            response = f"💰 Current inventory value: BND ${total_value:,.2f}"
+            response = f"Current inventory value: BND ${total_value:,.2f}"
             st.session_state.secure_messages.append({"role": "assistant", "content": response})
             st.rerun()
     
     with col4:
-        if st.button("⚠️ Security Alerts"):
-            response = "✅ No security alerts. All systems operational."
+        if st.button("Security Alerts"):
+            response = "No security alerts. All systems operational."
             st.session_state.secure_messages.append({"role": "assistant", "content": response})
             st.rerun()
     
@@ -2002,15 +2011,15 @@ def show_warehouse_assistant():
         # Generate secure response
         if "camera" in safe_prompt.lower() or "vision" in safe_prompt.lower():
             response = f"""
-            📱 **Camera Status:** {'Connected' if st.session_state.camera_connected else 'Disconnected'}
-            🔒 **Security:** Encryption {enc_status}
-            📊 **People Count:** {st.session_state.person_count if st.session_state.detection_enabled else 'Detection disabled'}
+            **Camera Status:** {'Connected' if st.session_state.camera_connected else 'Disconnected'}
+            **Security:** Encryption {enc_status}
+            **People Count:** {st.session_state.person_count if st.session_state.detection_enabled else 'Detection disabled'}
             
-            Need help? Go to Visionify AI tab for setup.
+            Need help? Go to Vision system tab for setup.
             """
         elif "security" in safe_prompt.lower():
             response = f"""
-            🔐 **Security Report:**
+            **Security Report:**
             - Session ID: {st.session_state.session_id[:8]}
             - Encryption: {enc_status}
             - Network: Private only
@@ -2024,7 +2033,7 @@ def show_warehouse_assistant():
         st.rerun()
     
     # Clear chat button
-    if st.button("🗑️ Clear Chat"):
+    if st.button("Clear Chat"):
         st.session_state.secure_messages = []
         st.rerun()
 
@@ -2039,16 +2048,16 @@ def update_sidebar():
     
     # Security status
     if st.session_state.camera_connected:
-        st.sidebar.success("📱 Camera: Secured")
+        st.sidebar.success("Camera: Secured")
     else:
-        st.sidebar.info("📱 Camera: Disconnected")
+        st.sidebar.info("Camera: Disconnected")
     
     # Session info
     st.sidebar.caption(f"Session: {st.session_state.session_id[:8]}")
     st.sidebar.caption(f"Last updated: {st.session_state.last_update.strftime('%H:%M:%S')}")
     
     # Security badge
-    enc_status = "🔒 SECURE" if CRYPTO_AVAILABLE else "🔓 UNENCRYPTED"
+    enc_status = "SECURE" if CRYPTO_AVAILABLE else "UNENCRYPTED"
     badge_color = "#2e7d32" if CRYPTO_AVAILABLE else "#b71c1c"
     st.sidebar.markdown(f"""
     <div style="background-color: {badge_color}; color: white; padding: 5px; border-radius: 5px; text-align: center;">
@@ -2059,23 +2068,23 @@ def update_sidebar():
 def show_setup_guide():
     """Display comprehensive setup guide for users"""
     
-    with st.sidebar.expander("📖 Secure Setup Guide", expanded=False):
+    with st.sidebar.expander("Setup Guide", expanded=False):
         st.markdown("""
-        ### 📱 iPhone Setup (IP Camera Lite)
+        **iPhone Setup (IP Camera Lite)**
         1. Download from App Store
         2. Open app → Tap "Start Server"
         3. Note URL (e.g., http://192.168.1.5:8081)
-        4. Enter URL in Visionify AI tab
+        4. Enter URL in Vision system tab
         5. Click "Secure Connect"
         
-        ### 🤖 Android Setup (IP Webcam)
+        **Android Setup (IP Webcam)**
         1. Download from Google Play
         2. Open app → Scroll down → "Start Server"
         3. Note URL displayed
-        4. Enter URL in Visionify AI tab
+        4. Enter URL in Vision system tab
         5. Click "Secure Connect"
         
-        ### 🔒 Security Features
+        **Security Features**
         - End-to-end encryption
         - Private network only
         - Rate limiting
@@ -2083,16 +2092,9 @@ def show_setup_guide():
         - Audit logging
         - Frame integrity verification
         
-        ### ⚠️ Requirements
+        **Requirements**
         ```bash
         pip install opencv-python-headless requests cryptography Pillow
-        ```
-        
-        ### 📁 Required Files
-        Create `packages.txt` in root:
-        ```
-        libgl1-mesa-glx
-        libglib2.0-0
         ```
         """)
 
@@ -2107,23 +2109,21 @@ def main():
         return
     
     # Header
-    st.markdown('<div class="brunei-flag">🇧🇳</div>', unsafe_allow_html=True)
-    st.markdown('<h1 class="main-header">BRUNEI DARUSSALAM<br>Secure Smart Inventory Management System</h1>', 
-                unsafe_allow_html=True)
+    st.markdown('<h1 class="main-header">WAREHOUSE STOCK INVENTORY SYSTEM</h1>', unsafe_allow_html=True)
     
     # Sidebar navigation
-    st.sidebar.title("📊 Secure Navigation")
+    st.sidebar.title("Navigation")
     page = st.sidebar.radio("Select Module:", [
-        "🏠 Executive Dashboard",
-        "📝 Product CRUD Dashboard",
-        "📦 Product Master List",
-        "📍 Inventory by Location",
-        "🔄 Stock Transactions",
-        "🚚 Purchase Orders",
-        "🏢 Supplier Directory",
-        "⚠️ Stock Alert Monitoring",
-        "🤖 Visionify AI Monitor",
-        "💬 Secure Warehouse Assistant"
+        "Executive Dashboard",
+        "Product CRUD Dashboard",
+        "Product Master List",
+        "Inventory by Location",
+        "Stock Transactions",
+        "Purchase Orders",
+        "Supplier Directory",
+        "Stock Alert Monitoring",
+        "Vision System",
+        "Warehouse Assistant"
     ])
     
     # Update sidebar with security info
@@ -2133,25 +2133,25 @@ def main():
     show_setup_guide()
     
     # Route to appropriate page
-    if page == "🏠 Executive Dashboard":
+    if page == "Executive Dashboard":
         show_executive_dashboard()
-    elif page == "📝 Product CRUD Dashboard":
+    elif page == "Product CRUD Dashboard":
         show_product_crud_dashboard()
-    elif page == "📦 Product Master List":
+    elif page == "Product Master List":
         show_product_master()
-    elif page == "📍 Inventory by Location":
+    elif page == "Inventory by Location":
         show_inventory_by_location()
-    elif page == "🔄 Stock Transactions":
+    elif page == "Stock Transactions":
         show_stock_transactions()
-    elif page == "🚚 Purchase Orders":
+    elif page == "Purchase Orders":
         show_purchase_orders()
-    elif page == "🏢 Supplier Directory":
+    elif page == "Supplier Directory":
         show_supplier_directory()
-    elif page == "⚠️ Stock Alert Monitoring":
+    elif page == "Stock Alert Monitoring":
         show_stock_alerts()
-    elif page == "🤖 Visionify AI Monitor":
+    elif page == "Vision System":
         show_visionify_ai()
-    elif page == "💬 Secure Warehouse Assistant":
+    elif page == "Warehouse Assistant":
         show_warehouse_assistant()
 
 if __name__ == "__main__":

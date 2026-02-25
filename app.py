@@ -16,7 +16,6 @@ import sys
 import threading
 import requests
 import cv2
-import imutils
 warnings.filterwarnings('ignore')
 
 # Page configuration
@@ -147,6 +146,17 @@ st.markdown("""
         border-radius: 8px;
         margin: 0.5rem 0;
     }
+    
+    /* Success animation */
+    @keyframes pulse {
+        0% { transform: scale(1); }
+        50% { transform: scale(1.05); }
+        100% { transform: scale(1); }
+    }
+    
+    .pulse {
+        animation: pulse 2s infinite;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -191,6 +201,8 @@ if 'detection_history' not in st.session_state:
     st.session_state.detection_history = []
 if 'frame_skip' not in st.session_state:
     st.session_state.frame_skip = 2  # Process every 2nd frame for better performance
+if 'connection_status' not in st.session_state:
+    st.session_state.connection_status = "disconnected"
 
 # Computer vision availability check
 CV_AVAILABLE = False
@@ -201,7 +213,10 @@ try:
     import cv2
     CV_AVAILABLE = True
     CV_BACKEND = "opencv"
-except ImportError as e:
+    # Test OpenCV
+    test_img = np.zeros((100, 100, 3), dtype=np.uint8)
+    cv2.cvtColor(test_img, cv2.COLOR_BGR2GRAY)
+except Exception as e:
     CV_ERROR = str(e)
     try:
         from PIL import Image
@@ -210,17 +225,12 @@ except ImportError as e:
     except ImportError:
         CV_ERROR = "No image processing libraries available"
 
+# Try YOLO/ML libraries (optional)
 try:
     from ultralytics import YOLO
     YOLO_AVAILABLE = True
 except ImportError:
     YOLO_AVAILABLE = False
-
-try:
-    import supervision as sv
-    SUPERVISION_AVAILABLE = True
-except ImportError:
-    SUPERVISION_AVAILABLE = False
 
 @st.cache_data(ttl=300)
 def load_initial_data():
@@ -463,11 +473,11 @@ def show_alerts():
         st.info("✅ No active alerts")
 
 # ============================================
-# MOBILE CAMERA VISION SYSTEM (Optimized for 192.168.100.158:8081)
+# MOBILE CAMERA VISION SYSTEM (Optimized for IP Camera Lite)
 # ============================================
 
 class MobileCameraVision:
-    """Connect mobile phone camera to vision system - Optimized for specific IP"""
+    """Connect mobile phone camera to vision system - Optimized for IP Camera Lite"""
     
     def __init__(self, camera_url):
         self.camera_url = camera_url.rstrip('/')
@@ -479,20 +489,38 @@ class MobileCameraVision:
         self.last_frame_time = time.time()
         self.fps = 0
         self.connection_retries = 0
-        self.max_retries = 3
+        self.max_retries = 5
         self.session = requests.Session()
-        self.session.timeout = 2
+        self.session.timeout = 3
+        self.background = None
+        self.connected = False
         
+    def test_connection(self):
+        """Test if camera is reachable"""
+        try:
+            # Try multiple endpoints
+            endpoints = ['/shot.jpg', '/photo', '/capture', '/']
+            for endpoint in endpoints:
+                try:
+                    url = self.camera_url + endpoint
+                    response = self.session.get(url, timeout=2)
+                    if response.status_code == 200:
+                        return True, url
+                except:
+                    continue
+            return False, None
+        except:
+            return False, None
+    
     def get_frame(self):
-        """Fetch a single frame from the mobile camera with optimized endpoints"""
+        """Fetch a single frame from the mobile camera"""
         try:
             # Try different endpoints that IP Camera apps commonly use
             endpoints = [
-                '/shot.jpg',           # IP Webcam
+                '/shot.jpg',           # IP Webcam / IP Camera Lite
                 '/photo.jpg',           # Alternative
                 '/photo',               # Some apps
                 '/capture',              # Generic
-                '/video_frame',          # MJPEG frame
                 '/snapshot',             # Some IP cameras
                 '/image.jpg'             # Common endpoint
             ]
@@ -514,23 +542,27 @@ class MobileCameraVision:
                                 scale = 640 / width
                                 new_width = 640
                                 new_height = int(height * scale)
-                                img = cv2.resize(img, (new_width, new_height))
+                                img = cv2.resize(img, (new_width, new_height), interpolation=cv2.INTER_AREA)
                             
                             self.connection_retries = 0
+                            self.connected = True
                             return img
                             
-                except:
+                except Exception as e:
                     continue
             
-            # If all endpoints fail, return None
             self.connection_retries += 1
+            if self.connection_retries > self.max_retries:
+                self.connected = False
             return None
             
         except Exception as e:
             self.connection_retries += 1
+            if self.connection_retries > self.max_retries:
+                self.connected = False
             return None
     
-    def detect_objects_simple(self, frame):
+    def detect_motion(self, frame):
         """Simple motion-based detection (lightweight)"""
         try:
             height, width = frame.shape[:2]
@@ -540,12 +572,13 @@ class MobileCameraVision:
             gray = cv2.GaussianBlur(gray, (21, 21), 0)
             
             # Initialize background if not exists
-            if not hasattr(self, 'background'):
-                self.background = gray
+            if self.background is None:
+                self.background = gray.copy().astype("float")
                 return frame, 0
             
             # Compute difference
-            diff = cv2.absdiff(self.background, gray)
+            cv2.accumulateWeighted(gray, self.background, 0.5)
+            diff = cv2.absdiff(gray, cv2.convertScaleAbs(self.background))
             thresh = cv2.threshold(diff, 25, 255, cv2.THRESH_BINARY)[1]
             thresh = cv2.dilate(thresh, None, iterations=2)
             
@@ -555,27 +588,17 @@ class MobileCameraVision:
             person_count = 0
             for contour in contours:
                 area = cv2.contourArea(contour)
-                if area > 3000:  # Minimum area threshold
+                if area > 4000:  # Minimum area threshold
                     person_count += 1
                     (x, y, w, h) = cv2.boundingRect(contour)
                     cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
                     cv2.putText(frame, f"Person", (x, y-10), 
                                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
             
-            # Update background slowly
-            alpha = 0.5
-            self.background = cv2.addWeighted(self.background, 1-alpha, gray, alpha, 0)
-            
             return frame, person_count
             
         except Exception as e:
             return frame, 0
-    
-    def detect_objects_yolo(self, frame):
-        """YOLO-based detection (if available)"""
-        # This would integrate with YOLO when available
-        # For now, use simple detection
-        return self.detect_objects_simple(frame)
     
     def start(self):
         self.running = True
@@ -586,29 +609,47 @@ class MobileCameraVision:
         self.session.close()
 
 def show_mobile_camera_setup():
-    """UI for connecting to mobile camera - Pre-configured for 192.168.100.158:8081"""
-    st.markdown("### 📱 Connect Mobile Camera")
+    """UI for connecting to mobile camera - Optimized for IP Camera Lite"""
+    st.markdown("### 📱 Connect Mobile Camera (IP Camera Lite)")
     
     # Show the configured IP
     st.info(f"📡 Camera URL: **{st.session_state.phone_camera_url}**")
     
-    # Setup instructions (compact)
-    with st.expander("📖 Quick Setup Guide", expanded=False):
+    # Setup instructions
+    with st.expander("📖 Setup Guide for IP Camera Lite", expanded=True):
         st.markdown("""
-        1. **For iPhone**: Install "IP Camera Lite" from App Store
-        2. **For Android**: Install "IP Webcam" from Google Play
-        3. Connect phone to the same WiFi network as your computer
-        4. Open app and tap **"Start Server"**
-        5. The URL should match the one shown above
+        ### For iPhone (IP Camera Lite):
+        1. Download **IP Camera Lite** from App Store
+        2. Open the app and tap **"Start Server"** at the bottom
+        3. Note the URL shown (should be `http://192.168.100.158:8081`)
+        4. Ensure your iPhone and computer are on the **same WiFi network**
+        5. Click **"Connect"** below
+        
+        ### For Android (IP Webcam):
+        1. Download **IP Webcam** from Google Play
+        2. Open app and tap **"Start Server"** at the bottom
+        3. The URL will be displayed
+        4. Make sure it matches the URL above
         """)
     
     col1, col2, col3 = st.columns([1, 1, 2])
     
     with col1:
-        if st.button("🔌 Connect", use_container_width=True):
-            st.session_state.use_phone_camera = True
-            st.session_state.camera_active = True
-            st.rerun()
+        if st.button("🔌 Connect", use_container_width=True, type="primary"):
+            with st.spinner("Connecting to camera..."):
+                # Test connection first
+                test_cam = MobileCameraVision(st.session_state.phone_camera_url)
+                connected, working_url = test_cam.test_connection()
+                
+                if connected:
+                    st.session_state.use_phone_camera = True
+                    st.session_state.camera_active = True
+                    st.session_state.connection_status = "connected"
+                    st.success("✅ Connected successfully!")
+                    time.sleep(1)
+                    st.rerun()
+                else:
+                    st.error("❌ Could not connect to camera. Check if app is running.")
     
     with col2:
         if st.button("🔄 Test Connection", use_container_width=True):
@@ -616,10 +657,15 @@ def show_mobile_camera_setup():
                 try:
                     test_url = st.session_state.phone_camera_url + '/shot.jpg'
                     response = requests.get(test_url, timeout=3)
-                    if response.status_code == 200:
-                        st.success("✅ Camera is reachable!")
+                    if response.status_code == 200 and len(response.content) > 1000:
+                        st.success("✅ Camera is reachable and sending images!")
+                        st.balloons()
                     else:
                         st.error(f"❌ Camera returned status: {response.status_code}")
+                except requests.exceptions.ConnectionError:
+                    st.error("❌ Connection refused - Is the camera app running?")
+                except requests.exceptions.Timeout:
+                    st.error("❌ Connection timeout - Check WiFi network")
                 except Exception as e:
                     st.error(f"❌ Connection failed: {str(e)}")
     
@@ -633,6 +679,11 @@ def show_mobile_camera_setup():
     # Display feed if connected
     if st.session_state.get('use_phone_camera', False):
         st.markdown("### 📹 Live Camera Feed")
+        st.markdown("""
+        <div class="pulse" style="text-align: center; color: #27ae60;">
+            🟢 Camera Connected - Streaming Live
+        </div>
+        """, unsafe_allow_html=True)
         
         # Create placeholders
         feed_placeholder = st.empty()
@@ -645,59 +696,63 @@ def show_mobile_camera_setup():
                 st.session_state.mobile_cam.start()
                 st.session_state.frame_count = 0
             
-            # Get frame (skip frames for performance)
-            st.session_state.frame_count += 1
-            if st.session_state.frame_count % st.session_state.frame_skip == 0:
-                frame = st.session_state.mobile_cam.get_frame()
-                
-                if frame is not None:
-                    # Apply detection if enabled
-                    if st.session_state.vision_enabled:
-                        frame, person_count = st.session_state.mobile_cam.detect_objects_simple(frame)
-                        st.session_state.person_count = person_count
-                        
-                        # Add to history
-                        st.session_state.detection_history.append({
-                            'timestamp': datetime.now(),
-                            'person_count': person_count,
-                            'total_objects': person_count
-                        })
-                        if len(st.session_state.detection_history) > 100:
-                            st.session_state.detection_history = st.session_state.detection_history[-100:]
-                    
-                    # Display frame
-                    feed_placeholder.image(frame, channels="BGR", use_container_width=True)
-                    
-                    # Show stats
-                    with stats_placeholder.container():
-                        col1, col2, col3 = st.columns(3)
-                        with col1:
-                            if st.session_state.vision_enabled:
-                                st.metric("People Detected", st.session_state.person_count)
-                            else:
-                                st.metric("Camera Status", "🟢 Live")
-                        with col2:
-                            connection_status = "✅ Connected" if frame is not None else "⚠️ Issues"
-                            st.metric("Connection", connection_status)
-                        with col3:
-                            fps = 10 // st.session_state.frame_skip
-                            st.metric("FPS", f"~{fps}")
-                    
-                else:
-                    feed_placeholder.warning("⚠️ Waiting for camera feed... Check if camera app is running")
-                    
-                    # Auto-reconnect logic
-                    if st.session_state.mobile_cam.connection_retries > 3:
-                        st.error("Failed to connect after multiple attempts")
-                        if st.button("🔄 Reconnect"):
-                            st.session_state.mobile_cam = MobileCameraVision(st.session_state.phone_camera_url)
-                            st.session_state.mobile_cam.start()
-                            st.session_state.mobile_cam.connection_retries = 0
-                            st.rerun()
+            # Get frame
+            frame = st.session_state.mobile_cam.get_frame()
             
-            # Auto-refresh
-            time.sleep(0.1)
-            st.rerun()
+            if frame is not None:
+                # Apply detection if enabled
+                if st.session_state.vision_enabled:
+                    frame, person_count = st.session_state.mobile_cam.detect_motion(frame)
+                    st.session_state.person_count = person_count
+                    
+                    # Add to history
+                    st.session_state.detection_history.append({
+                        'timestamp': datetime.now(),
+                        'person_count': person_count,
+                        'total_objects': person_count
+                    })
+                    if len(st.session_state.detection_history) > 100:
+                        st.session_state.detection_history = st.session_state.detection_history[-100:]
+                
+                # Display frame
+                feed_placeholder.image(frame, channels="BGR", use_container_width=True)
+                
+                # Show stats
+                with stats_placeholder.container():
+                    col1, col2, col3, col4 = st.columns(4)
+                    with col1:
+                        if st.session_state.vision_enabled:
+                            st.metric("People Detected", st.session_state.person_count)
+                        else:
+                            st.metric("Camera Status", "🟢 Live")
+                    with col2:
+                        st.metric("Resolution", f"{frame.shape[1]}x{frame.shape[0]}")
+                    with col3:
+                        st.metric("Connection", "✅ Stable")
+                    with col4:
+                        if st.button("⏹️ Disconnect", use_container_width=True):
+                            if 'mobile_cam' in st.session_state:
+                                st.session_state.mobile_cam.stop()
+                                del st.session_state.mobile_cam
+                            st.session_state.use_phone_camera = False
+                            st.session_state.camera_active = False
+                            st.rerun()
+                
+                # Auto-refresh
+                time.sleep(0.1)
+                st.rerun()
+                
+            else:
+                feed_placeholder.warning("⚠️ Waiting for camera feed... Make sure IP Camera Lite is running")
+                
+                # Auto-reconnect logic
+                if st.session_state.mobile_cam.connection_retries > 3:
+                    st.error("Failed to connect after multiple attempts")
+                    if st.button("🔄 Reconnect"):
+                        st.session_state.mobile_cam = MobileCameraVision(st.session_state.phone_camera_url)
+                        st.session_state.mobile_cam.start()
+                        st.session_state.mobile_cam.connection_retries = 0
+                        st.rerun()
             
         except Exception as e:
             st.error(f"Camera error: {str(e)}")
@@ -705,14 +760,14 @@ def show_mobile_camera_setup():
             # Disconnect button
             col1, col2 = st.columns(2)
             with col1:
-                if st.button("🔄 Try Again"):
+                if st.button("🔄 Try Again", use_container_width=True):
                     if 'mobile_cam' in st.session_state:
                         st.session_state.mobile_cam.stop()
                     st.session_state.use_phone_camera = False
                     st.session_state.camera_active = False
                     st.rerun()
             with col2:
-                if st.button("⏹️ Disconnect"):
+                if st.button("⏹️ Disconnect", use_container_width=True):
                     if 'mobile_cam' in st.session_state:
                         st.session_state.mobile_cam.stop()
                         del st.session_state.mobile_cam
@@ -920,11 +975,11 @@ def show_vision_system():
     # Camera source selection
     camera_source = st.radio(
         "Select Camera Source:",
-        ["📱 Mobile Phone Camera (192.168.100.158:8081)", "🎮 Demo Mode (Simulated)"],
+        ["📱 Mobile Phone Camera (IP Camera Lite)", "🎮 Demo Mode (Simulated)"],
         horizontal=True
     )
     
-    if camera_source == "📱 Mobile Phone Camera (192.168.100.158:8081)":
+    if camera_source == "📱 Mobile Phone Camera (IP Camera Lite)":
         show_mobile_camera_setup()
     else:
         if st.session_state.get('vision_demo_mode', False):
@@ -940,14 +995,6 @@ def show_vision_system():
                 st.markdown("### System Status")
                 if CV_AVAILABLE:
                     st.success(f"✅ Computer Vision: Available (Backend: {CV_BACKEND})")
-                    if YOLO_AVAILABLE:
-                        st.success("✅ YOLO: Available")
-                    else:
-                        st.warning("⚠️ YOLO: Not installed")
-                    if SUPERVISION_AVAILABLE:
-                        st.success("✅ Supervision: Available")
-                    else:
-                        st.warning("⚠️ Supervision: Not installed")
                 else:
                     st.error(f"❌ Computer Vision: Not available")
                     if CV_ERROR:
@@ -994,20 +1041,18 @@ class WarehouseChatbot:
         elif 'order' in query_lower:
             return f"📋 {len(st.session_state.purchase_orders_df)} purchase orders"
         elif 'camera' in query_lower or 'mobile' in query_lower or 'phone' in query_lower:
-            return """📱 **Mobile Camera Help:**
-Your camera is configured for: **http://192.168.100.158:8081**
-
-1. Install IP Camera Lite (iPhone) or IP Webcam (Android)
-2. Connect phone to same WiFi network
-3. Start server in app
-4. Click "Connect" button above
-5. Enable AI Vision for detection"""
+            return """📱 **Mobile Camera Setup (IP Camera Lite):**
+1. Install IP Camera Lite from App Store
+2. Open app and tap "Start Server"
+3. URL should be: http://192.168.100.158:8081
+4. Click "Connect" in the Vision System tab
+5. Enable AI Vision for people counting"""
         else:
             return """🤖 I can help you with:
 - 📦 Inventory queries
 - ⚠️ Stock alerts
 - 🏢 Supplier information
-- 📱 Mobile camera (192.168.100.158:8081)
+- 📱 Mobile camera (IP Camera Lite)
 - 📊 Reports and analytics
 What would you like to know?"""
 
@@ -1090,7 +1135,7 @@ def show_ai_innovations():
         - ✅ Inventory Management
         - ✅ Purchase Orders
         - ✅ Supplier Directory
-        - ✅ Mobile Camera Vision (IP: 192.168.100.158:8081)
+        - ✅ Mobile Camera Vision (IP Camera Lite @ 192.168.100.158:8081)
         - ⏳ Barcode Scanning (Coming soon)
         """)
 

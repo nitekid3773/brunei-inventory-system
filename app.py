@@ -13,6 +13,10 @@ from collections import defaultdict
 import warnings
 import subprocess
 import sys
+import threading
+import requests
+import cv2
+import imutils
 warnings.filterwarnings('ignore')
 
 # Page configuration
@@ -127,6 +131,22 @@ st.markdown("""
         font-family: monospace;
         margin: 1rem 0;
     }
+    
+    /* Camera feed styling */
+    .camera-feed {
+        border: 3px solid #3498db;
+        border-radius: 10px;
+        overflow: hidden;
+        margin: 1rem 0;
+    }
+    
+    .stats-panel {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 1rem;
+        border-radius: 8px;
+        margin: 0.5rem 0;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -155,6 +175,20 @@ if 'simulation_running' not in st.session_state:
     st.session_state.simulation_running = False
 if 'show_install_guide' not in st.session_state:
     st.session_state.show_install_guide = False
+if 'use_phone_camera' not in st.session_state:
+    st.session_state.use_phone_camera = False
+if 'phone_camera_url' not in st.session_state:
+    st.session_state.phone_camera_url = ""
+if 'camera_active' not in st.session_state:
+    st.session_state.camera_active = False
+if 'vision_enabled' not in st.session_state:
+    st.session_state.vision_enabled = False
+if 'person_count' not in st.session_state:
+    st.session_state.person_count = 0
+if 'object_counts' not in st.session_state:
+    st.session_state.object_counts = {}
+if 'detection_history' not in st.session_state:
+    st.session_state.detection_history = []
 
 # Computer vision availability check
 CV_AVAILABLE = False
@@ -320,7 +354,7 @@ if st.session_state.products_df is None:
      st.session_state.documents_df) = load_initial_data()
 
 # ============================================
-# PAGE FUNCTIONS
+# PAGE FUNCTIONS (Inventory Management)
 # ============================================
 
 def show_executive_dashboard():
@@ -427,7 +461,202 @@ def show_alerts():
         st.info("✅ No active alerts")
 
 # ============================================
-# VISION SYSTEM
+# MOBILE CAMERA VISION SYSTEM
+# ============================================
+
+class MobileCameraVision:
+    """Connect mobile phone camera to vision system"""
+    
+    def __init__(self, camera_url):
+        self.camera_url = camera_url.rstrip('/')
+        self.running = False
+        self.current_frame = None
+        self.person_count = 0
+        self.object_counts = {}
+        
+    def get_frame(self):
+        """Fetch a single frame from the mobile camera"""
+        try:
+            # Try different endpoints
+            endpoints = ['/shot.jpg', '/photo.jpg', '/video_frame', '/capture']
+            
+            for endpoint in endpoints:
+                try:
+                    url = self.camera_url + endpoint
+                    img_resp = requests.get(url, timeout=3)
+                    if img_resp.status_code == 200:
+                        img_arr = np.array(bytearray(img_resp.content), dtype=np.uint8)
+                        img = cv2.imdecode(img_arr, -1)
+                        if img is not None:
+                            img = imutils.resize(img, width=640)
+                            return img
+                except:
+                    continue
+            
+            # If all endpoints fail, try MJPEG stream
+            stream_url = self.camera_url + '/video'
+            return self._get_stream_frame(stream_url)
+            
+        except Exception as e:
+            st.error(f"Camera connection error: {str(e)}")
+            return None
+    
+    def _get_stream_frame(self, stream_url):
+        """Get frame from MJPEG stream"""
+        try:
+            import urllib.request
+            stream = urllib.request.urlopen(stream_url)
+            bytes_data = bytes()
+            while True:
+                bytes_data += stream.read(1024)
+                a = bytes_data.find(b'\xff\xd8')
+                b = bytes_data.find(b'\xff\xd9')
+                if a != -1 and b != -1:
+                    jpg = bytes_data[a:b+2]
+                    bytes_data = bytes_data[b+2:]
+                    img = cv2.imdecode(np.frombuffer(jpg, dtype=np.uint8), cv2.IMREAD_COLOR)
+                    if img is not None:
+                        return imutils.resize(img, width=640)
+        except:
+            return None
+    
+    def detect_objects(self, frame):
+        """Simple object detection (simulated for now)"""
+        # This would integrate with YOLO when available
+        # For now, return simulated detection
+        
+        height, width = frame.shape[:2]
+        
+        # Simulate person detection based on motion or contours
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        blur = cv2.GaussianBlur(gray, (5, 5), 0)
+        
+        # Simple motion detection
+        if not hasattr(self, 'prev_frame'):
+            self.prev_frame = blur
+            return 0, {}
+        
+        # Frame difference
+        diff = cv2.absdiff(blur, self.prev_frame)
+        _, thresh = cv2.threshold(diff, 25, 255, cv2.THRESH_BINARY)
+        
+        # Find contours
+        contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        
+        person_count = 0
+        for contour in contours:
+            area = cv2.contourArea(contour)
+            if area > 5000:  # Minimum area threshold
+                person_count += 1
+                # Draw bounding box
+                x, y, w, h = cv2.boundingRect(contour)
+                cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
+                cv2.putText(frame, f"Person", (x, y-10), 
+                           cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+        
+        self.prev_frame = blur
+        self.person_count = person_count
+        self.object_counts = {'person': person_count}
+        
+        return frame
+    
+    def start(self):
+        self.running = True
+        
+    def stop(self):
+        self.running = False
+
+def show_mobile_camera_setup():
+    """UI for setting up mobile camera connection"""
+    st.markdown("### 📱 Connect Mobile Camera")
+    
+    # Setup instructions
+    with st.expander("📖 Setup Instructions", expanded=True):
+        st.markdown("""
+        1. **Install IP Webcam app** on your Android phone from [Google Play](https://play.google.com/store/apps/details?id=com.pas.webcam)
+        2. **For iPhone**: Install "IP Camera Lite" from App Store
+        3. Connect your phone and computer to the **same WiFi network**
+        4. Open the app and tap **"Start Server"** (bottom of screen)
+        5. You'll see a URL like: `http://192.168.1.5:8080`
+        6. Enter that URL below
+        """)
+    
+    col1, col2 = st.columns([3, 1])
+    
+    with col1:
+        camera_url = st.text_input(
+            "Camera URL",
+            placeholder="http://192.168.1.5:8080",
+            value=st.session_state.phone_camera_url,
+            key="camera_url_input",
+            help="Enter the URL shown in your IP Webcam app"
+        )
+    
+    with col2:
+        if st.button("🔌 Connect", use_container_width=True):
+            if camera_url:
+                st.session_state.phone_camera_url = camera_url
+                st.session_state.use_phone_camera = True
+                st.session_state.camera_active = True
+                st.rerun()
+    
+    # Display feed if connected
+    if st.session_state.get('use_phone_camera', False):
+        st.markdown("### 📹 Live Camera Feed")
+        
+        try:
+            # Initialize mobile camera
+            if 'mobile_cam' not in st.session_state:
+                st.session_state.mobile_cam = MobileCameraVision(st.session_state.phone_camera_url)
+                st.session_state.mobile_cam.start()
+            
+            # Get frame
+            frame = st.session_state.mobile_cam.get_frame()
+            
+            if frame is not None:
+                # Apply detection if enabled
+                if st.session_state.vision_enabled:
+                    frame = st.session_state.mobile_cam.detect_objects(frame)
+                
+                # Display frame
+                st.image(frame, channels="BGR", use_container_width=True)
+                
+                # Detection stats
+                if st.session_state.vision_enabled:
+                    col1, col2, col3 = st.columns(3)
+                    with col1:
+                        st.metric("People Detected", st.session_state.mobile_cam.person_count)
+                    with col2:
+                        total_objects = sum(st.session_state.mobile_cam.object_counts.values())
+                        st.metric("Total Objects", total_objects)
+                    with col3:
+                        st.metric("Camera Status", "🟢 Live")
+                
+                # Auto-refresh
+                time.sleep(0.1)
+                st.rerun()
+                
+            else:
+                st.error("Failed to get camera feed. Check URL and connection.")
+                if st.button("🔄 Retry"):
+                    st.rerun()
+            
+            # Disconnect button
+            if st.button("⏹️ Disconnect Camera"):
+                st.session_state.use_phone_camera = False
+                st.session_state.camera_active = False
+                if 'mobile_cam' in st.session_state:
+                    st.session_state.mobile_cam.stop()
+                    del st.session_state.mobile_cam
+                st.rerun()
+                
+        except Exception as e:
+            st.error(f"Camera error: {str(e)}")
+            st.session_state.use_phone_camera = False
+            st.session_state.camera_active = False
+
+# ============================================
+# VISION SYSTEM (Demo Mode)
 # ============================================
 
 def check_system_dependencies():
@@ -623,46 +852,55 @@ def show_vision_system():
     """Main vision system interface"""
     st.markdown('<div class="section-header">👁️ AI Vision System</div>', unsafe_allow_html=True)
     
-    if st.session_state.get('vision_demo_mode', False):
-        show_vision_demo()
-        if st.button("Exit Demo Mode"):
-            st.session_state.vision_demo_mode = False
-            st.session_state.simulation_running = False
-            st.rerun()
-        return
+    # Camera source selection
+    camera_source = st.radio(
+        "Select Camera Source:",
+        ["📱 Mobile Phone Camera", "🎮 Demo Mode (Simulated)"],
+        horizontal=True
+    )
     
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        st.markdown("### System Status")
-        if CV_AVAILABLE:
-            st.success(f"✅ Computer Vision: Available (Backend: {CV_BACKEND})")
-            if YOLO_AVAILABLE:
-                st.success("✅ YOLO: Available")
-            else:
-                st.warning("⚠️ YOLO: Not installed")
-            if SUPERVISION_AVAILABLE:
-                st.success("✅ Supervision: Available")
-            else:
-                st.warning("⚠️ Supervision: Not installed")
+    if camera_source == "📱 Mobile Phone Camera":
+        show_mobile_camera_setup()
+    else:
+        if st.session_state.get('vision_demo_mode', False):
+            show_vision_demo()
+            if st.button("Exit Demo Mode"):
+                st.session_state.vision_demo_mode = False
+                st.session_state.simulation_running = False
+                st.rerun()
         else:
-            st.error(f"❌ Computer Vision: Not available")
-            if CV_ERROR:
-                st.code(f"Error: {CV_ERROR}")
-    
-    with col2:
-        st.markdown("### Quick Actions")
-        if st.button("🎮 Try Demo Mode (No Camera Needed)"):
-            st.session_state.vision_demo_mode = True
-            st.rerun()
-        if st.button("🔧 Show Installation Guide"):
-            st.session_state.show_install_guide = not st.session_state.show_install_guide
-    
-    if st.session_state.get('show_install_guide', False):
-        show_installation_guide()
-    
-    with st.expander("🔍 System Dependencies Check"):
-        check_system_dependencies()
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                st.markdown("### System Status")
+                if CV_AVAILABLE:
+                    st.success(f"✅ Computer Vision: Available (Backend: {CV_BACKEND})")
+                    if YOLO_AVAILABLE:
+                        st.success("✅ YOLO: Available")
+                    else:
+                        st.warning("⚠️ YOLO: Not installed")
+                    if SUPERVISION_AVAILABLE:
+                        st.success("✅ Supervision: Available")
+                    else:
+                        st.warning("⚠️ Supervision: Not installed")
+                else:
+                    st.error(f"❌ Computer Vision: Not available")
+                    if CV_ERROR:
+                        st.code(f"Error: {CV_ERROR}")
+            
+            with col2:
+                st.markdown("### Quick Actions")
+                if st.button("🎮 Try Demo Mode"):
+                    st.session_state.vision_demo_mode = True
+                    st.rerun()
+                if st.button("🔧 Show Installation Guide"):
+                    st.session_state.show_install_guide = not st.session_state.show_install_guide
+            
+            if st.session_state.get('show_install_guide', False):
+                show_installation_guide()
+            
+            with st.expander("🔍 System Dependencies Check"):
+                check_system_dependencies()
 
 # ============================================
 # AI CHATBOT
@@ -690,11 +928,19 @@ class WarehouseChatbot:
             return f"🏢 {len(st.session_state.suppliers_df)} suppliers in database"
         elif 'order' in query_lower:
             return f"📋 {len(st.session_state.purchase_orders_df)} purchase orders"
+        elif 'camera' in query_lower or 'mobile' in query_lower or 'phone' in query_lower:
+            return """📱 **Mobile Camera Help:**
+1. Install IP Webcam app on your phone
+2. Connect to same WiFi
+3. Start server in app
+4. Enter the URL shown
+5. Enable AI Vision for detection"""
         else:
             return """🤖 I can help you with:
 - 📦 Inventory queries
 - ⚠️ Stock alerts
 - 🏢 Supplier information
+- 📱 Mobile camera setup
 - 📊 Reports and analytics
 What would you like to know?"""
 
@@ -777,7 +1023,7 @@ def show_ai_innovations():
         - ✅ Inventory Management
         - ✅ Purchase Orders
         - ✅ Supplier Directory
-        - ⏳ Computer Vision (Demo Mode Active)
+        - ✅ Mobile Camera Vision (IP Webcam)
         - ⏳ Barcode Scanning (Coming soon)
         """)
 
@@ -804,10 +1050,15 @@ def main():
         
         st.markdown("---")
         
-        if CV_AVAILABLE:
-            st.success(f"✅ Vision: {CV_BACKEND}")
+        # Camera status indicator
+        if st.session_state.get('camera_active', False):
+            st.success("📱 Camera: Connected")
+            if st.session_state.vision_enabled:
+                st.success("👁️ Vision: Active")
+            else:
+                st.info("👁️ Vision: Disabled")
         else:
-            st.warning("⚠️ Vision: Demo Mode")
+            st.info("📱 Camera: Disconnected")
         
         st.caption(f"Last updated: {datetime.now().strftime('%Y-%m-%d %H:%M')}")
     
